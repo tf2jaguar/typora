@@ -699,3 +699,206 @@ table_space_cost + 3 * table_time_cost &lt;= lookup_space_cost + 3 * lookup_time
 ## 0x04 思考
 
 最后，给你留⼀个道作业题，switch-case 语句⽀持枚举类型，你能通过分析字节码写出其底层的实现原理吗？
+
+---
+
+# 对象相关字节码
+
+## 0x01 new, \<init> & \<clinit>
+
+在 Java 中 new 是⼀个关键字，在字节码中也有⼀个指令 new。当我们创建⼀个对象时，背后发⽣了哪些事情呢？
+
+```java
+ScoreCalculator calculator = new ScoreCalculator();
+```
+
+对应的字节码如下：
+
+```shell
+0: new #2 					// class ScoreCalculator
+3: dup 
+4: invokespecial #3	// Method ScoreCalculator."<init>":()V
+
+7: astore_1
+```
+
+⼀个对象创建的套路是这样的：new、dup、invokespecial，下次遇到同样的指令要形成条件反射。 
+
+
+
+为什么创建⼀个对象需要三条指令呢？ 
+
+⾸先，我们需要清楚类的构造器函数是以 <init>函数名出现的，被称为实例的初始化⽅法。调⽤ new 指令时，只是创建了⼀个类的实例，但是还没有调⽤构造器函 数，使⽤ invokespecial 调⽤了 <init> 后才真正调⽤了构造器函数，正是因为需要调⽤这个函数才导致中间必须要有⼀个 dup 指令，不然调⽤完<init>函数以后，操作数栈为空，就再也找不回刚刚创建 的对象了。
+
+<img src="pic/JVM字节码从入门到精通/image-20211114202341900.png" alt="image-20211114202341900" style="zoom:50%;" />
+
+前⾯我们知道 <init> 会调⽤构造器函数，<clinit> 是类的静态初始化 ⽐ <init> 调⽤得更早⼀些，<clinit> 不会直接被调⽤，它在下⾯这个四个指令触发调⽤：new, getstatic, putstatic or invokestatic 。也就是说，初始化⼀个类实例、访问⼀个静态变量或者⼀个静态⽅法，类的静态初始化⽅法就会被触发。
+
+看⼀个具体的例⼦
+
+```java
+public class Initializer { 
+  static int a; 
+  static int b; 
+  static {
+    a = 1; b = 2; 
+  } 
+} 
+```
+
+部分字节码如下 
+
+```shell
+static {}; 
+	0: iconst_1 
+	1: putstatic 		#2				// Field a:r
+	4: iconst_2 
+	5: putstatic 		#3				// Field b:I
+	8: return
+```
+
+上⾯的 static {} 就对应我们刚说的 <clinit>
+
+## 0x02 相关⾯试题分析
+
+某东的⼀个⾯试题如下，类 A 和类 B 的关系如下
+
+```java
+public class A { 
+  static { 
+    System.out.println("A init"); 
+  } 
+  public A() { 
+    System.out.println("A Instance" ); 
+  } 
+}
+
+public class B extends A { 
+  static { 
+    System.out.println("B init"); 
+  } 
+  public B() { 
+    System.out.println("B Instance" ); 
+  } 
+}
+```
+
+### 问题 1： A a = new B(); 输出结果及正确的顺序？ 
+
+要彻底搞清楚这个问题，需要弄清楚 B 构造器函数的字节码。
+
+```shell
+public B();
+	0: aload_0 	
+	1: invokespecial #1 		// Method A."<init>":()V
+	4: getstatic #2 				// Field java/lang/System.out:Ljava/io/PrintStream;
+	7: ldc #3 							// String B Instance
+	9: invokevirtual #4 		// Method java/io/PrintStream.println:(Ljava/lang/String;)V
+ 12: return
+```
+
+从 B 的构造器函数字节码可以看到它⾸先默默的帮忙调⽤了 A 的构造器函数 所以刚刚的过程是 new B() 的 <init> 触发了 B 的静态初始化 <clinit>，但这时⽗类 A 还没有进⾏静态初始化，会先进⾏ A 的静态初始化，然后执⾏ B 的构造器函数时，先调⽤了 A 的 <init> 构造器函数，最后执⾏ B 的构造器函数。
+
+<img src="pic/JVM字节码从入门到精通/image-20211114204451086.png" alt="image-20211114204451086" style="zoom:50%;" />
+
+所以上述答案是：
+
+```
+A init 
+B init 
+A Instance 
+B Instance
+```
+
+### 问题 2：B[] arr = new B[10] 会输出什么？
+
+这涉及到数组的初始化指令，对应字节码如下：
+
+```shell
+bipush 10 
+anewarray 'B' 
+astore 1
+```
+
+
+
+# invokeXXX 指令
+
+## 0x01 ⽅法的静态绑定与动态绑定
+
+
+
+## invokestatic
+
+
+
+## invokevirtual vs invokespecial
+
+
+
+
+
+# HSDB
+
+
+
+# 匿名内部类
+
+
+
+
+
+# i++ vs ++i
+
+
+
+# syntactic sugar
+
+
+
+# try-catch-finally 
+
+
+
+# try-with-resource
+
+
+
+# Kotlin
+
+
+
+# synchronized
+
+
+
+# java泛型
+
+
+
+# javac 编译原理
+
+## javac 源码调试
+
+
+
+# Java Instrumentation 包
+
+
+
+# ASM
+
+
+
+# CGLIB
+
+
+
+# CRACK
+
+
+
+# APM
+
+
+
