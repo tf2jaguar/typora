@@ -6,7 +6,7 @@
 
 这篇文章我们以输出 "Hello, World" 来开始字节码之旅，如果之前没有怎么接触过字节码的话，这篇文章应该能够让你对字节码有一个最基本的认识。 
 
-## **0x01 java** 文件如何变成 **.class** 文件
+## 0x01 java 文件如何变成 .class文件
 
 新建一个 Hello.java 文件，源码如下:
 
@@ -36,7 +36,7 @@ xxd Hello.class
 00000060: 0004 7468 6973 0100 074c 4865 6c6c 6f3b ..this...LHello;
 ```
 
-## **0x02** 魔数 **0xCAFEBABE**
+## 0x02 魔数 0xCAFEBABE
 
 <img src="pic/JVM字节码从入门到精通/image-20211114092002409.png" alt="image-20211114092002409" style="zoom:50%;" />
 
@@ -46,7 +46,7 @@ Java 早期开发者选用了这样一个浪漫气息的魔数，高司令有解
 
 这个魔数是 JVM 识别 .class 文件的标志，虚拟机在加载类文件之前会先检查这四个字节，如果不是 0xCAFEBABE 则拒绝加载该文件，更多关于字节码格式的说明，我们会在后面的文章中慢慢介绍。
 
-## **0x03 javap** 详解
+## 0x03 javap 详解
 
 类文件是二进制块，想直接与它打交道比较艰难，但是很多情况下我们必须理解类文件。比如服务器上的接又出了 bug，重新打包部署以后问题并没有解决，为了找出原因你可能需要看一下部署以后的 class 文件究竟是不是我们想要的。还有一种情况跟你合作的开发商跑路了，只给你留下一堆编译过的代码，没有源代码，当出 bug 时我们需要研究这些类文件，看问题出在哪里。 好在 JDK 提供了专门 用来分析类文件的工具:javap，用来方便的窥探 class 文件内部的细节。javap 有比较多的参数选项，其中-c -v -l -p -s 是最常用的。
 
@@ -232,8 +232,470 @@ end
 
 每个栈帧内部都包含⼀组称为局部变量表（Local Variables）的变量列表，局部变量表的⼤⼩在编译期间就已经确定。Java 虚拟机使⽤局部变量表来完成⽅法调⽤时的参数传递，当⼀个⽅法被调⽤时，它 的参数会被传递到从 0 开始的连续局部变量列表位置上。当⼀个实例⽅法（⾮静态⽅法）被调⽤时，第 0 个局部变量是调⽤这个实例⽅法的对象的引⽤（也就是我们所说的 this ）
 
+<img src="pic/JVM字节码从入门到精通/image-20211114154220381.png" alt="image-20211114154220381" style="zoom:50%;" />
+
 ### 操作数栈
 
 每个栈帧内部都包含了⼀个称为操作数栈的后进先出（LIFO）栈，栈的⼤⼩同样也是在编译期间确定。Java 虚拟机提供的⼀些字节码指令⽤来从局部变量表或者对象实例的字段中复制常量或者变量到操 作数栈，也有⼀些指令⽤于从操作数栈取⾛数据、操作数据和把操作结果重新⼊栈。在⽅法调⽤时，操作数栈也⽤来准备调⽤⽅法的参数和接收⽅法返回的结果。
 
 ⽐如 iadd 指令⽤来将两个 int 类型的数值相加，它要求执⾏之前操作数栈已经存在两个由前⾯其它指令放⼊的 int 型数值，在 iadd 指令执⾏时，两个 int 值从操作数栈中出栈，相加求和，然后将求和的结 果重新⼊栈。
+
+⽐如 1 + 2 这样的指令执⾏过程如下
+
+<img src="pic/JVM字节码从入门到精通/image-20211114154739107.png" alt="image-20211114154739107" style="zoom:50%;" />
+
+整个 JVM 指令执⾏的过程就是局部变量表与操作数栈之间不断 load、store 的过程
+
+<img src="pic/JVM字节码从入门到精通/image-20211114154812393.png" alt="image-20211114154812393" style="zoom:50%;" />
+
+我们再来看⼀个稍微复杂⼀点的例⼦
+
+```java
+public class ScoreCalculator {
+	public void record(double score) { 
+  }
+	public double getAverage() { 
+    return 0; 
+  }
+} 
+
+public static void main(String[] args) { 
+  ScoreCalculator calculator = new ScoreCalculator();
+	
+  int score1 = 1; 
+  int score2 = 2;
+	
+  calculator.record(score1); 
+  calculator.record(score2);
+  
+	double avg = calculator.getAverage();
+}
+```
+
+javap 查看字节码输出如下
+
+```shell
+public static void main(java.lang.String[]); 
+descriptor: ([Ljava/lang/String;)V 
+flags: ACC_PUBLIC, ACC_STATIC 
+Code:
+	stack=3, locals=6, args_size=1 
+	0: new #2 								// class ScoreCalculator 
+	3: dup 
+	4: invokespecial #3 			// Method ScoreCalculator."<init>":()V 
+	7: astore_1
+
+	8: iconst_1 
+	9: istore_2
+	
+	10: iconst_2 
+	11: istore_3
+	
+	12: aload_1 
+	13: iload_2 
+	14: i2d 
+	15: invokevirtual #4			// Method ScoreCalculator.record:(D)V
+
+	18: aload_1 
+	19: iload_3 
+	20: i2d 
+	21: invokevirtual #4			// Method ScoreCalculator.record:(D)V
+
+	24: aload_1 
+	25: invokevirtual #5 			// Method ScoreCalculator.getAverage:()D
+	28: dstore 4
+
+	30: return
+```
+
+- 0 ~ 7：新建了⼀个 ScoreCalculator 对象，使⽤ astore_1 存储在局部变量 calculator 中：astore_1 的含义是把栈顶的值存储到局部变量表下标为 1 的位置上，这⾥为什么会有⼀个 dup，我们后⾯会讲到 
+- 8 ~ 11：iconst_1 和 iconst_2 ⽤来将整数 1 和 2 加载到栈顶，istore_2 和 istore_3 ⽤来将栈顶的元素存储到局部变量表 2 和 3 的位置上 
+- 12 ~ 15：可以看到 *store* 指令会把栈顶元素移除，所以下次我们要⽤到这些局部变量时，需要使⽤ load 命令重新把它加载到栈顶。⽐如我们要执⾏calculator.record(score1)，对应的字节码如 下
+
+> 12: aload_1 
+>
+> 13: iload_2 
+>
+> 14: i2d 
+>
+> 15: invokevirtual #4 			// Method ScoreCalculator.record:(D)V
+>
+> 可以看到 aload_1 先从局部变量表中 1 的位置加载 calculator 对象，iload_2 从 局部变量表中 2 的位置加载⼀个整型值，i2d 这个指令⽤来将整型值转为 double 并将新的值重新⼊栈，到⽬前为⽌参数全部就 绪，可以⽤ invokevirtual 执⾏⽅法调⽤了
+
+- 24 ~ 28：同样是⼀个普通的⽅法调⽤，流程还是先 aload_1 加载 calculator 对象，invokevirtual 调⽤ getAverage ⽅法，并将 栈顶元素存储到局部变量表下标为 4 的位置上 有⼀点需要注意的是 javap 输出的 locals=6，但是我们⽬前看到的局部变量只有args、calculator、score1、score2、avg这 5 个，为什么这⾥等于 6 呢？这是因为 avg 为 double 型变量，需要两个槽位 （slot） 整个过程局部变量表如下图所⽰
+
+![image-20211114155744056](pic/JVM字节码从入门到精通/image-20211114155744056.png)
+
+其实局部变量表可以通过 javap ⽤ -l 参数直接输出，但是我们⽤ javap -v -p -l MyLocalVariableTest 并没有输出任何局部变量表相关的信息。这是因为默认情况下局部变量表属于调试级别的信 息，javac 编译的时候并没有编译进字节码，我们可以加上 javac -g ⽣成字节码的时候同时⽣成所有的调试信息，如下所⽰
+
+```shell
+javac -g MyLocalVariableTest.java 
+javap -v -p -l MyLocalVariableTest 
+
+LocalVariableTable:
+Start Length Slot Name Signature
+		0 		31 		0 args [Ljava/lang/String; 
+		8 		23 		1 calculator LScoreCalculator; 
+		10 		21 		2 score1 	I 
+		12 		19 		3 score2 	I 
+		30 		 1 		4 avg 		D
+```
+
+## 0x03 从⼆进制看 class ⽂件和字节码
+
+```java
+public class Get { String name;
+	public String getName() { 
+	  return name; 
+	}
+}
+```
+
+javap 查看字节码如下
+
+```shell
+public java.lang.String getName(); 
+descriptor: ()Ljava/lang/String; 
+flags: ACC_PUBLIC 
+Code:
+	stack=1, locals=1, args_size=1 
+	0: aload_0 
+	1: getfield #2 / Field name:Ljava/lang/String; 
+	4: areturn
+```
+
+![image-20211114160236099](pic/JVM字节码从入门到精通/image-20211114160236099.png)
+
+直接从⼆进制来看下这个 class ⽂件 xxd Get.class
+
+<img src="pic/JVM字节码从入门到精通/image-20211114160307987.png" alt="image-20211114160307987" style="zoom:50%;" />
+
+我们可以⼿动⽤ 16 进制编辑器去修改这些字节码⽂件，只是⽐较容易出错，所以产⽣了⼀些字节码操作的⼯具，最出名的莫过于 ASM 和 Javassist。我们后⾯讲到软件破解的时候，会介绍直接修改字节 码和通过 ASM 动态修改字节码这两种⽅式
+
+## 0x04 ⼩结
+
+⼀起来回顾⼀下这篇⽂章的要点：
+
+- 第⼀，基于栈和基于寄存器指令集的优劣势； 
+- 第⼆，讲解了 JVM 栈帧的构成（局部变量表、操作数栈、指向运⾏时常量池的引⽤），顺带讲解了 javap -l 参数和其在局部变量表中的应⽤；
+-  第三，从类⽂件⼆进制⾓度看字节码的实现，并引出 ASM 字节码改写技术。
+
+## 0x05 思考
+
+最后，给你留⼀道作业，⽤ Java 写⼀个简单的 class ⽂件解析⼯具⽀持输出函数列表。
+
+
+
+---
+
+
+
+# 3. 控制转移指令
+
+控制转移指令，也就是 if-else、三⽬表达式、switch-case 背后的指令。
+
+## 0x01 概述
+
+根据字节码的不同⽤途，可以⼤概分为如下⼏类 
+
+- 加载和存储指令，⽐如 iload 将⼀个整形值从局部变量表加载到操作数栈 
+- 控制转移指令，⽐如条件分⽀ ifeq 
+- 对象操作，⽐如创建类实例的指令 new 
+- ⽅法调⽤，⽐如 invokevirtual 指令⽤于调⽤对象的实例⽅法 
+- 运算指令和类型转换，⽐如加法指令 iadd 
+- 线程同步，monitorenter 和 monitorexit 两条指令来⽀持 synchronized 关键字的语义 
+- 异常处理，⽐如 athrow 显式抛出异常
+
+## 0x02 控制转移指令
+
+<img src="pic/JVM字节码从入门到精通/image-20211114160749418.png" alt="image-20211114160749418" style="zoom:50%;" />
+
+控制转移指令根据条件进⾏分⽀跳转，我们常见的 if-then-else、三⽬表达式、for 循环、异常处理等都属于这个范畴。对应的指令集包括：
+
+- 条件分⽀：ifeq、iflt、ifle、ifne、ifgt、ifge、ifnull、ifnonnull、if_icmpeq、 if_icmpne、if_icmplt, if_icmpgt、if_icmple、if_icmpge、if_acmpeq 和 if_acmpne。
+- 复合条件分⽀：tableswitch、lookupswitch 
+- ⽆条件分⽀：goto、goto_w、jsr、jsr_w、ret
+
+看⼀个 for 循环的例⼦
+
+```java
+public class MyLoopTest { 
+  public static int[] numbers = new int[]{1, 2, 3}; 
+  public static void main(String[] args) { 
+    ScoreCalculator calculator = new ScoreCalculator(); 
+    for (int number : numbers) { 
+      calculator.record(number); 
+    } 
+  } 
+}
+```
+
+对应的字节码
+
+```shell
+public static void main(java.lang.String[]); 
+Code:
+	0: new 						#2 			// class ScoreCalculator 
+	3: dup 
+	4: invokespecial  #3 			// Method ScoreCalculator."<init>":()V 
+	7: astore_1
+
+	8: getstatic 			#4			// Field numbers:[I
+ 11: astore_2 
+ 12: aload_2 
+ 13: arraylength 
+ 14: istore_3 
+ 15: iconst_0 
+ 16: istore					4
+
+ 18: iload 					4 
+ 20: iload_3 
+ 21: if_icmpge 			43 
+ 24: aload_2 
+ 25: iload 4				4 
+ 27: iaload 
+ 28: istore 				5
+ 30: aload_1 
+ 31: iload 					5 
+ 33: i2d 
+ 34: invokevirtual  #5			// Method ScoreCalculator.record:(D)V		
+ 37: iinc 					4, 1
+ 40: goto						18
+ 41: return
+```
+
+先把局部变量表的⽰意图放出来便于理解
+
+![image-20211114161611284](pic/JVM字节码从入门到精通/image-20211114161611284.png)
+
+- 0 ~ 7：new、dup 和⼀个 的 invokespecial 表⽰创建新类实例，下⼀节会重点介绍 
+- 8 ~ 16：是初始化循环控制变量的⼀个过程。加载静态变量数组引⽤，存储到局部变量下标为 2 的位置上，记为$array，aload_2 加载 $array到栈顶，调⽤ arraylength 指令 获取数组长度存储到栈 顶，随后调⽤ istore_3 将数组长度存储到局部变量表中第 3 个位置，记为 $len。
+
+Java 虚拟机指令集使⽤不同的字节码来区分不同的操作数类型，⽐如 iconst_0、istore_1、iinc、if_icmplt 都只针对于 int 数据类型。
+
+同时注意到 istore_3 和 istore 4 使⽤了不同形式的指令类型，它们的作⽤都是把栈顶元素存⼊到局部变量表的指定位置。对于 3 采⽤了 istore_3，它属于 istore_<i>指令组，其中 i 只能是0 1 2 3 。其实 把istore_3 写成 istore 3 也能获取正确的结果，但是编译的字节码会变长，在字节码执⾏时也需要获取和解析 3 这个额外的操作数。
+
+类似的做法还有 iconst_<i>，可以将 -1 0 1 2 3 4 5 压⼊操作数栈。这么做的⽬的是把使⽤最频繁的⼏个操作数融⼊到指令中，使得字节码更简洁⾼效
+
+iconst_0 将整型值 0 加载到栈顶，随后将它存储到局部变量表第 4 个位置，记为 $i，写成伪代码就是
+
+```
+$array = numbers; 
+$len = $array.arraylength 
+$i = 0
+```
+
+- 18 ~ 34：是真正的循环体。⾸先加载 $i和 $len到栈顶，然后调⽤ if_icmpge 进⾏⽐较，如果 $i >= $len ，直接跳转到指令 43，也就是 return，函数结束。如果$i < $len ，执⾏循环体，加 载$array、$i，然后 iaload 指令把下标为 $i 的数组元素加载到操作数栈上，随后存储到局部变量表下标为 5 的位置上，记为$item。随后调⽤ invokevirtual 指令来执⾏ record ⽅法 
+- 37 ~ 40：执⾏循环后的 $i ⾃增操作。
+
+iinc 这个指令⽐较特殊，之前介绍的指令都是基于操作数栈来实现功能，iinc 是⼀个例外，它直接对局部变量进⾏⾃增操作，不要先⼊栈、加⼀、再出栈，因此效率⾮常⾼，适合循环结构。
+
+这⼀段写成伪代码就是
+
+```
+@start: if ($i >= $len) return; 
+$item = $array[$i] 
+++ $i 
+goto @start
+```
+
+整段代码是不是⾮常熟悉，看看下⾯这个代码
+
+```
+for (int i = 0; i < numbers.length; i++) { 
+	calculator.record(numbers[i]); 
+}
+```
+
+由此可见，for(item : array) 就是⼀个语法糖，javac 会让它现出原形，回归到它的本质
+
+## 0x02 你不⼀定知道的 switch 底层实现
+
+<img src="pic/JVM字节码从入门到精通/image-20211114162508242.png" alt="image-20211114162508242" style="zoom:50%;" />
+
+如果让你来设计⼀个 switch-case 的底层实现，你会如何来实现？是⼀个个 if-else 来判断吗？ 实际上编译器将使⽤ tableswitch 和 lookupswitch 两个指令来⽣成 switch 语句的编译代码。为什么会有两个呢？ 这充分体现了效率上的考量。
+
+```java
+int chooseNear(int i) { 
+	switch (i) { 
+		case 100: return 0; 
+		case 101: return 1; 
+		case 104: return 4; 
+		default: return -1; 
+	} 
+}
+```
+
+字节码如下：
+
+```shell
+0: iload_1 
+1: tableswitch { // 100 to 104
+				100: 36 
+				101: 38 
+				102: 42 
+				103: 42 
+				104: 40 
+		default: 42 
+}
+36: iconst_0 		// return 0
+37: ireturn 
+38: iconst_1 		// return 1
+39: ireturn 
+40: iconst_4 		// return 4
+41: ireturn 
+42: iconst_m1 	// return -1
+43: ireturn
+```
+
+细⼼的同学会发现，代码中的 case 中并没有出现 102、103，为什么字节码中出现了呢？ 编译器会对 case 的值做分析，如果 case 的值⽐较紧凑，中间有少量断层或者没有断层，会采⽤ tableswitch 来实现 switch-case，有断层的会⽣成⼀些虚假的 case 帮忙补齐连续，这样可以实现 O(1) 时间复杂度的查找：因为 case 已经被补齐为连续的，通过游标就可以⼀次找到。
+
+伪代码如下
+
+```java
+int val = pop(); 								// pop an int from the stack
+if (val < low || val > high) {  // if its less than <low> or greater than <high>, 
+	pc += default; 								// branch to default
+} else {												// otherwise
+	pc += table[val - low]; 			// branch to entry in table
+}
+```
+
+我们来看⼀个 case 值断层严重的例⼦
+
+```java
+int chooseFar(int i) { 
+  switch (i) { 
+    case 1: return 1; 
+    case 10: return 10; 
+    case 100: return 100; 
+    default: return -1; 
+  } 
+}
+```
+
+对应字节码
+
+```shell
+0: iload_1 
+1: lookupswitch { // 3
+					1: 36 
+				 10: 38 
+				100: 41 
+		default: 44 
+}
+```
+
+如果还是采⽤上⾯那种 tableswitch 补齐的⽅式，就会⽣成上百个假 case，class ⽂件也爆炸式增长，这种做法显然不合理。lookupswitch应运⽽⽣，它的键值都是经过排序的，在查找上可以采⽤⼆分查找的 ⽅式，时间复杂度为 O(log n)
+
+结论是：switch-case 语句 在 case ⽐较稀疏的情况下，编译器会使⽤ lookupswitch 指令来实现，反之，编译器会使⽤ tableswitch 来实现
+
+### 补充内容：稀疏与否到底是什么意思
+
+读者提问，下⾯的代码编译出的 switch-case 语句为什么采⽤了 lookupswitch，⽽不是 tableswitch，不是说「如果 case 的值⽐较紧凑，中间有少量断层或者没有断层，会采⽤ tableswitch 来实现 switchcase」吗？
+
+```java
+public static void foo() {
+	int a = 0; 
+  switch (a) { 
+    case 0:
+			System.out.println("#0"); 
+      break; 
+    case 1:
+			System.out.println("#1"); 
+      break; 
+    default: 
+      System.out.println("default"); 
+      break;
+	}
+}
+```
+
+对应字节码
+
+```shell
+public static void foo(); 
+	0: iconst_0 
+	1: istore_0 
+	2: iload_0 
+	3: lookupswitch { // 2 
+						0: 28 
+						1: 39 
+			default: 50 
+	}
+```
+
+
+
+这个问题⽐较有意思，我调试了⼀下 javac 的源码，主要是 tableswitch 和 lookupswitch 代价的估算。
+
+```c
+hi=1 
+lo=0 
+nlabels = 2
+
+// table_space_cost = 4 + (1 - 0 + 1) = 6 
+long table_space_cost = 4 + ((long) hi - lo + 1); // words
+
+// table_time_cost = 3 
+long table_time_cost = 3; // comparisons
+
+// lookup_space_cost = 3 + 2 * 2 = 7 
+long lookup_space_cost = 3 + 2 * (long) nlabels;
+
+// lookup_time_cost = 2 
+long lookup_time_cost = nlabels;
+
+// table_space_cost + 3 * table_time_cost = 6 + 3 * 3 = 15 
+// lookup_space_cost + 3 * lookup_time_cost = 7 + 3 * 2 = 13 
+// opcode = 15 <= 13 ? tableswitch : lookupswich
+
+int opcode = nlabels > 0 && 
+  table_space_cost + 3 * table_time_cost <= lookup_space_cost + 3 * lookup_time_cost 
+  ? tableswitch : lookupswitch;
+```
+
+所以在 case 值只有 0， 1 两个的情况下，代价的计算是 table_space_cost + 3 * table_time_cost > lookup_space_cost + 3 * lookup_time_cost，lookupswich代价更⼩选 lookupswich 
+
+
+
+如果有三个呢？
+
+```c
+hi=2 
+lo=0 
+nlabels = 3
+
+// table_space_cost = 4 + (2 - 0 + 1) = 7 
+long table_space_cost = 4 + ((long) hi - lo + 1); // words
+
+// table_time_cost = 3 
+long table_time_cost = 3; // comparisons
+
+// lookup_space_cost = 3 + 2 * 3 = 9 
+long lookup_space_cost = 3 + 2 * (long) nlabels;
+
+// lookup_time_cost = 3 
+long lookup_time_cost = nlabels;
+
+// table_space_cost + 3 * table_time_cost = 7 + 3 * 3 = 16 
+// lookup_space_cost + 3 * lookup_time_cost = 9 + 3 * 3 = 18 
+// opcode = 16 <= 18 ? tableswitch : lookupswich
+
+int opcode = nlabels > 0 &&
+table_space_cost + 3 * table_time_cost &lt;= lookup_space_cost + 3 * lookup_time_cost
+? tableswitch : lookupswitch;
+```
+
+所以在 case 值只有 0， 1，2 三个的情况下，代价的计算是 table_space_cost + 3 * table_time_cost < lookup_space_cost + 3 * lookup_time_cost，tableswitch 代价更⼩选 tableswitch 其实在数量极少的情况下，两个的差别不⼤，只是 javac 这⾥的算法导致选择了 lookupswitch
+
+## 0x03 ⼩结
+
+这篇⽂章以 for 和 switch-case 语句为例讲解了控制转移指令的实现细节，⼀起来回顾⼀下要点： 
+
+- 第⼀，for(item : array) 语法糖实际上会改写为for (int i = 0; i < numbers.length; i++) 的形式；
+- 第⼆，switch-case 语句 在 case 稀疏程度不同的情况下会分别采⽤ lookupswitch 和 tableswitch 指令来实现。
+
+## 0x04 思考
+
+最后，给你留⼀个道作业题，switch-case 语句⽀持枚举类型，你能通过分析字节码写出其底层的实现原理吗？
