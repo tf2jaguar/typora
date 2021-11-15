@@ -702,7 +702,7 @@ table_space_cost + 3 * table_time_cost &lt;= lookup_space_cost + 3 * lookup_time
 
 ---
 
-# 对象相关字节码
+# 4. 对象相关字节码
 
 ## 0x01 new, \<init> & \<clinit>
 
@@ -820,29 +820,791 @@ anewarray 'B'
 astore 1
 ```
 
+anewarray 接收栈顶的元素（数组的长度），新建⼀个数组引⽤。由此可见新建⼀个 B 的数组没有触发任何类或者实例的初始化操作。所以问题 2 的答案是什么也不会输出 
+
+### 问题 3：新增⼀个静态不可变对象会输出什么？
+
+如果把 B 的代码稍微改⼀下，新增⼀个静态不可变对象，调⽤System.out.println(B.HELLOWORD) 会输出什么？
+
+  ```java
+  public class B extends A { 
+    public static final String HELLOWORD = "hello word" ; 
+    static{ 
+      System.out.println("B init"); 
+    } 
+    public B() { 
+      System.out.println("B Instance" ); 
+    } 
+  } 
+  
+  public class InitOrderTest { 
+    public static void main(String[] args) { 
+      System.out.println(B.HELLOWORD); 
+    } 
+  }
+  ```
+
+同样这⾥要回归到字节码和 JVM 本⾝上，System.out.println(B.HELLOWORD)对应的字节码如下：
+
+```shell
+0: getstatic 			#2 			// Field java/lang/System.out:Ljava/io/PrintStream;
+3: ldc 						#4 			// String hellow word
+5: invokevirtual	#5			// Method java/io/PrintStream.println:(Ljava/lang/String;)V
+```
+
+InitOrderTest 常量池信息如下： 
+
+```shell
+#1 = Methodref 			#7.#21 		// java/lang/Object."<init>":()V
+#2 = Fieldref 			#22.#23 	// java/lang/System.out:Ljava/io/PrintStream;
+#3 = Class 					#24 			// B
+#4 = String 				#25				// hellow word
+```
+
+可以看到同样没有触发任何 B 有关的初始化指令。虽然我们引⽤了 B 类的常量 HELLOWORD，但是这个常量在编译期间就被放到了 InitOrderTest 类的常量池中，不会与 B 发⽣任何关系 所以题⽬ 3 的答 案除了"hello world"以外什么也不会输出。
+
+### 问题 4：为什么局部变量没有初始化就不能使⽤，⽽对象的实例变量就可以？
+
+为什么局部变量没有初始化，就不能使⽤。⽽⼀个对象的实例变量（⽆⼿动初始化）就可以⽤在后⾯的⽅法使⽤呢？
+
+也就是下⾯的代码输出 0
+
+```java
+public class TestLocal { 
+  int a; 
+  public static void main(String[] args) { 
+    TestLocal testLocal = new TestLocal(); 
+    System.out.println(testLocal.a); 
+  } 
+}
+```
+
+⽽下⾯的代码编译出错，报error: variable b might not have been initialized
+
+```java
+public class TestLocal {
+	public void foo() { 
+    int b; 
+    System.out.println(b); 
+  }
+
+	public static void main(String[] args) { 
+    TestLocal testLocal = new TestLocal(); 
+    testLocal.foo(); 
+  }
+}
+```
+
+看起来是⼀个⾮常简单的问题，这背后的原理牵扯到 new 指令背后对象初始化的过程。以下⾯这个复杂⼀点的例⼦为例。
+
+```java
+public class TestLocal {
+	private int a; 
+  private static int b = 199; 
+  static {
+		System.out.println("log from static block"); 
+  } 
+  
+  public TestLocal() {
+		System.out.println("log from constructor block"); 
+  }
+
+  {
+		System.out.println("log from init block");
+	}
+
+	public static void main(String[] args) { 
+    TestLocal testLocal = new TestLocal(); 
+  }
+}
+```
+
+输出： 
+
+```shell
+log from static block 
+log from init block 
+log from constructor block
+```
+
+如果去看源码的话，整个初始化过程简化如下（省略了若⼲步)：
+
+- 类加载校验：将类 TestLocal 加载到虚拟机 
+- 执⾏ static 代码块 
+- 为对象分配堆内存 
+- 对成员变量进⾏初始化（对象的实例字段在可以不赋初始值就直接使⽤，⽽局部变量中如果不赋值就直接使⽤，因为没有这⼀步操作，不赋值是属于未定义的状态，编译器会直接报错） 
+- 调⽤初始化代码块 
+- 调⽤构造器函数（可见构造器函数在初始化代码块之后执⾏）
+
+弄清楚了这个流程，就很容易理解开始提出的问题了，简单来讲就是对象初始化的时候⾃动帮我们把未赋值的变量赋值为了初始值。
+
+## 0x03 ⼩结
+
+这篇⽂章讲解了对象初始化相关的指令，⼀起来回顾⼀下要点：
+
+- 第⼀，创建⼀个对象通常是 new、dup、 <init>的 invokespecial 三条指令⼀起出现； 
+- 第⼆，类的静态初始化<clinit> 会在下⾯这个四个指令触发调⽤：new, getstatic, putstatic or invokestatic 。
+
+## 0x04 思考
+
+最后，给你留⼀个道作业题，下⾯的代码会输出什么？原因是什么
+
+```java
+class Father {
+    private int i = fTest();
+    private int j = sTest();
+    private static int k = method();
+
+    static {
+        System.out.println("(父类静态代码块)");
+    }
+
+    Father() {
+        System.out.println("(父类构造函数)");
+    }
+
+    {
+        System.out.println("(父类初始化代码块)");
+    }
+
+    public int sTest() {
+        System.out.println("(父类和子类同名的普通函数)");
+        return 1;
+    }
+
+    public int fTest() {
+        System.out.println("(父类普通属性调用的普通函数)");
+        return 1;
+    }
+
+    public static int method() {
+        System.out.println("(父类静态变量掉用的静态方法)");
+        return 1;
+    }
+
+    public static int method2() {
+        System.out.println("(父类静态方法)");
+        return 1;
+    }
+}
+
+public class Son extends Father {
+    private int i = test();
+    private static int j = method();
+
+    static {
+        System.out.println("(子类静态代码块)");
+    }
+
+    Son() {
+        System.out.println("(子类构造函数)");
+    }
+
+    {
+        System.out.println("(子类初始化代码块)");
+    }
+
+    public int test() {
+        System.out.println("(子类普通属性调用的普通函数)");
+        return 1;
+    }
+
+    public int sTest() {
+        System.out.println("(子类和父类同名的普通函数)");
+        return 1;
+    }
+
+    public static int method() {
+        System.out.println("(子类静态变量掉用的静态方法)");
+        return 1;
+    }
+
+    public static void main(String[] args) {
+        Son s1 = new Son();
+        System.out.println();
+        Son s2 = new Son();
+    }
+}
+```
+
+ 输出
+
+```shell
+(父类静态变量掉用的静态方法)
+(父类静态代码块)
+(子类静态变量掉用的静态方法)
+(子类静态代码块)
+(父类普通属性调用的普通函数)
+(子类和父类同名的普通函数)
+(父类初始化代码块)
+(父类构造函数)
+(子类普通属性调用的普通函数)
+(子类初始化代码块)
+(子类构造函数)
+
+(父类普通属性调用的普通函数)
+(子类和父类同名的普通函数)
+(父类初始化代码块)
+(父类构造函数)
+(子类普通属性调用的普通函数)
+(子类初始化代码块)
+(子类构造函数)
+```
+
+> 这里存在一个细节：**父类初始化属性时，掉用了被子类重写的函数**，这时候不会执行父类的函数，只会执行子类重写后的函数
 
 
-# invokeXXX 指令
+
+---
+
+
+
+# 5. invokeXXX 指令
+
+前⾯我们看到过⼏个关于⽅法调⽤的指令了。⽐如上篇⽂章有讲到的对象实例初始化<init>函数由 invokespecial 调⽤。这篇⽂章我们将介绍关于⽅法调⽤的五个指令：
+
+- invokestatic：⽤于调⽤静态⽅法
+-  invokespecial：⽤于调⽤私有实例⽅法、构造器，以及使⽤ super 关键字调⽤⽗类的实例⽅法或构造器，和所实现接⼜的默认⽅法 
+- invokevirtual：⽤于调⽤⾮私有实例⽅法
+-  invokeinterface：⽤于调⽤接⼜⽅法
+- invokedynamic：⽤于调⽤动态⽅法
 
 ## 0x01 ⽅法的静态绑定与动态绑定
 
+<img src="pic/JVM字节码从入门到精通/image-20211115161250741.png" alt="image-20211115161250741" style="zoom:50%;" />
+
+要理解为什么需要上⾯ 5 种⽅法调⽤，需要先弄清楚 Java 的两种⽅法绑定⽅式：静态绑定与动态绑定。 在编译时时能确定⽬标⽅法叫做静态绑定，相反地，需要在运⾏时根据调⽤者的类型动态识别的 叫动态绑定
+
+invokestatic 和 invokespecial 这两个指令对应的⽅法是静态绑定的，invokestatic 调⽤的是类的静态⽅法，在编译期间确定，运⾏期不会修改。剩下的三个都属于动态绑定，下⾯进⾏⼀⼀介绍。
+
+## 0x02 invokestatic
+
+invokestatic ⽤来调⽤静态⽅法，即使⽤ static 关键字修饰的⽅法。 它要调⽤的⽅法在编译期间确定，运⾏期不会修改，属于静态绑定。它也是所有⽅法调⽤指令⾥⾯最快的。⽐如 Integer.valueOf("42")对应字节码
+
+```shell
+0: ldc 						#2		// String 42
+2: invokestatic 	#3    // Method java/lang/Integer.valueOf:(Ljava/lang/String;)Ljava/lang/Integer;
+5: pop
+```
+
+## 0x03 invokevirtual vs invokespecial 既⽣瑜何⽣亮
+
+- invokevirtual：⽤来调⽤ public、protected、package 访问级别的⽅法 
+- invokespecial：顾名思义，它是「特殊」的⽅法，包括实例构造⽅法、私有⽅法（private 修饰的⽅法）和⽗类⽅法（即 super 关键字调⽤的⽅法）。很明显，这些「特殊」的⽅法可以直接确定实际 执⾏的⽅法的实现，与 invokestatic ⼀样，也属于静态绑定 
+
+在 JDK 1.0.2 之前，invokespecial 指令曾被命名为 invokenonvirtual，以区别于 invokevirtual 
+
+看到这⾥，你有没有想过为什么有了 invokevirtual 还需要 invokespecial 的存在呢？ 
+
+其实 java 虚拟机规范⾥⾯有⽐较详细的介绍 
+
+> The difference between the invokespecial and the invokevirtual instructions is that invokevirtual invokes a method based on the class of the object. The invokespecial instruction is used to invoke instance initialization methods as well as private methods and methods of a superclass of the current class.
+
+- invokespecial ⽤在在类加载时就能确定需要调⽤的具体⽅法，⽽不需要等到运⾏时去根据实际的对象值去调⽤该对象的⽅法。private ⽅法不会因为继承被覆写的，所以 private ⽅法归为了 invokespecial 这⼀类。
+-  invokevirtual ⽤在⽅法要根据对象类型不同动态选择的情况，在编译期不确定。
+
+举⼀个实际的例⼦
+
+```java
+public class Color { 
+  public void printColorName() { 
+    System.out.println("Color name from parent"); 
+  } 
+} 
+public class Red extends Color { 
+  @Override 
+  public void printColorName() { 
+    System.out.println("Color name is Red"); 
+  } 
+} 
+public class Yellow extends Color { 
+  @Override 
+  public void printColorName() { 
+    System.out.println("Color name is Yellow" ); 
+  } 
+} 
+public class InvokeVirtualTest { 
+  private static Color yellowColor = new Yellow(); 
+  private static Color redColor = new Red(); 
+  public static void main(String[] args) { 
+    yellowColor.printColorName(); 
+    redColor.printColorName(); 
+  } 
+}
+```
+
+输出 
+
+```shell
+Color name is Yellow 
+Color name is Red
+```
+
+我们来看⼀下 main 函数的字节码
+
+```shell
+0: getstatic 				#2 	// Field yellowColor:LColor;
+3: invokevirtual 		#3 	// Method Color.printColorName:()V
+6: getstatic 				#4 	// Field redColor:LColor;
+9: invokevirtual 		#3	// Method Color.printColorName:()V
+```
+
+可以看到 3 和 9 ⾏指令完全⼀样，都是Color.printColorName，并没有被编译器改写为Yellow.printColorName和Red.printColorName。
+
+它们最终调⽤的⽬标⽅法却不同，invokevirtual 会根据对象的实际类 型进⾏分派（虚⽅法分派），在编译期间不能确定最终会调⽤⼦类还是⽗类的⽅法。
+
+## 0x04 invokeinterface vs invokevirtual 孪⽣兄弟⼤不同
+
+invokeinterface ⽤于调⽤接⼜⽅法，在运⾏时再确定⼀个实现此接⼜的对象。 那它跟 invokevirtual 有什么区别呢？为什么不⽤ invokevirtual 来实现接⼜⽅法的调⽤？其实也不是不可以，只是为了效率上的 考量。
+
+invokestatic 指令需要调⽤的⽅法只属于某个特定的类，在编译期唯⼀确定，不会运⾏时动态变化，是最快的 invokespecial 指令可能调⽤的⽅法也在编译期确定，且只有少数⼏个需要处理的⽅法，查找也 ⾮常快 
+
+invokevirtual 和 invokeinterface 的关系就⽐较微妙了，区别没有那么明显，我们⽤⼀个实际的例⼦来说明，可以这么认为，每个类⽂件都关联着⼀个「虚⽅法表」（virtual method table），这个表中包含了 ⽗类的⽅法和⾃⼰扩展的⽅法。⽐如
+
+```java
+class A { 
+  public void method1() { } 
+  public void method2() { } 
+  public void method3() { } 
+}
+
+class B extends A { 
+  public void method2() { } // overridden from BaseClass 
+  public void method4() { } 
+}
+```
+
+对应的虚⽅法表如下
+
+<img src="pic/JVM字节码从入门到精通/image-20211115162820714.png" alt="image-20211115162820714" style="zoom:50%;" />
+
+现在 B 类的虚⽅法表保留了⽗类 A 中⽅法的顺序，只是覆盖了 method2() 指向的函数链接和新增了method4()。 假设这时需要调⽤ method2 ⽅法，invokevirtual 只需要直接去找虚⽅法表位置为 2 的地⽅的 函数引⽤就可以了
+
+如果是⽤ invokeinterface，这样的优化是没法起作⽤的，⽐如，我们改⼀下让 B 实现 X 接⼜
+
+```java
+interface X { 
+  void methodX() 
+} 
+class B extends A implements X {
+	public void method2() { } // overridden from BaseClass
+	public void method4() { }
+	public void methodX() { } 
+} 
+class C implements X {
+	public void methodC() { }
+	public void methodX() { } 
+}
+```
+
+这样的情况下虚⽅法表如下
+
+![image-20211115162932611](pic/JVM字节码从入门到精通/image-20211115162932611.png)
+
+这种情况下，B 类的 methodX 在位置 5 的地⽅，C 类的 methodX 在位置 2 的地⽅，如果要⽤ invokevirtual 调⽤ methodX 就不能直接从固定的虚⽅法表索引位置拿到对应的⽅法链接。invokeinterface 不得 不搜索整个虚⽅法表来找到对应⽅法，效率上远不如 invokevirtual
+
+## 0x05 动态⽅法调⽤秘密武器 invokedynamic
+
+invokedynamic 是五种 invoke ⾥⾯最复杂的，下⼀篇⽂章将专门介绍 invokedynamic 的概念
+
+## 0x06 ⼩结
+
+这篇⽂章讲解了⽅法调⽤的 5 个指令，⼀起来回顾⼀下要点：
+
+- 第⼀，介绍了动态绑定和静态绑定的区别。 
+- 第⼆，介绍了 invokestatic、invokevirtual、invokespecial、invokeinterface 四个指令背后深层次效率上的考量。
+
+## 0x07 思考
+
+最后，给你留两道思考题
+
+1. invokestatic、invokevirtual、invokespecial、invokeinterface 这四个指令调⽤效率的排序是怎么样的？
+
+2. JDK8 的 lambda 表达式为什么采⽤ invokedynamic 来实现？跟匿名内部类的⽅式相⽐有哪些优点？
+
+# 6. 通过 HSDB ⼯具窥探 JVM 运⾏时数据
+
+## 0x01 HSDB 基础
+
+HSDB 全称是：Hotspot Debugger，是内置的 JVM ⼯具，可以⽤来深⼊分析 JVM 运⾏时的内部状态。HSDB 位于 JDK 安装⽬录下的 lib/sa-jdi.jar 中， 启动 HSDB 
+
+```shell
+sudo java -cp sa-jdi.jar sun.jvm.hotspot.HSDB
+```
+
+不出意外就会弹出下⾯的界⾯，在 File 菜单中可以选择 attach 到⼀个 Hotspot JVM 进程、或者打开⼀个 core ⽂件、或者连接到⼀个远程的 debug server。
+
+<img src="pic/JVM字节码从入门到精通/image-20211115163208574.png" alt="image-20211115163208574" style="zoom:50%;" />
+
+attach 到⼀个 JVM 进程是最常⽤的选项，进程号的获取可以⽤系统⾃带的 ps 命令，也可以⽤ jps 命令。 在弹出的输⼊框中输⼊进程号以后默认展⽰当前线程列表。
+
+<img src="pic/JVM字节码从入门到精通/image-20211115163232818.png" alt="image-20211115163232818" style="zoom:50%;" />
+
+Tools 选项中有很多功能可供我们选择，⽐如查看类列表、查看堆信息、inspect 对象内存、死锁检测等，每个都值得好好玩⼀下。
+
+<img src="pic/JVM字节码从入门到精通/image-20211115163258543.png" alt="image-20211115163258543" style="zoom:50%;" />
+
+## 0x02 利⽤ HSDB 来看多态的基础 vtable
+
+⽰例代码如下
+
+```java
+public abstract class A { 
+  public void printMe() { 
+    System.out.println("I love vim" ); 
+  } 
+  public abstract void sayHello(); 
+} 
+
+public class B extends A { 
+  @Override 
+  public void sayHello() { 
+    System.out.println("hello, i am child B"); 
+  } 
+}
+
+public class MyTest { 
+  public static void main(String[] args) throws IOException { 
+    A obj = new B(); 
+    System.in.read(); 
+    System.out.println(obj); 
+  } 
+}
+```
+
+运⾏ MyTest，在命令⾏中执⾏ jps，找到 MyTest 的进程 ID 97169
+
+```shell
+jps 
+97169 MyTest
+```
+
+在 HSDB 的界⾯中选择File->Attach to Hotspot process ，输⼊进程号，然后选择Tools->Class Browser 可以找到对象列表，找到 B 对象的内存指针地址。
+
+```shell
+B @0x00000007c0060418
+```
+
+然后选择Tools->Inspector输⼊ B 的上⾯的内存指针地址：
+
+<img src="pic/JVM字节码从入门到精通/image-20211115163458137.png" alt="image-20211115163458137" style="zoom:50%;" />
+
+可以看到它的 vtable 的长度为 7。先说结论：有 5 个是 上帝类 Object 的 5 个⽅法，⼀个是 B 覆写的 sayHello ⽅法，⼀个是继承 A 的 printMe ⽅法，接下来我们来验证。 vtable 分配在 instanceKlass 对象实例的内存末尾，instanceKlass⼤⼩在 64 位系统的⼤⼩为 0x1b8，因此 vtable 的起始地址等于 instanceKlass 的内存⾸地址加上 0x1B8 等于 0x00000007C00605D0
+
+```shell
+0x00000007c0060418 + 0x1B8 = 0x00000007C00605D0
+```
+
+在 HSDB 的 console 输⼊ mem 查看实际的内存分布。mem 命令接受的两个参数都必选，⼀个是起始地址，另⼀个是长度。 输⼊ mem 0x7C00605D0 7 就可以查看 vtable 内存起始地址的 7 个⽅法指针地址 了。
+
+<img src="pic/JVM字节码从入门到精通/image-20211115163546426.png" alt="image-20211115163546426" style="zoom:50%;" />
+
+可以看到 vtable 的前 5 条⼀⼀对应 java.lang.Object 的五个⽅法，vtable ⾥存储的是指向⽅法内存的指针
+
+```shell
+void finalize() 
+boolean equals(java.lang.Object) 
+java.lang.String toString() 
+int hashCode() 
+java.lang.Object clone()
+```
+
+我们继续看剩下的两个函数地址
+
+<img src="pic/JVM字节码从入门到精通/image-20211115163650127.png" alt="image-20211115163650127" style="zoom:50%;" />
+
+可以看到 B 类的有⼀个函数是指向 A 类的⽅法 printMe。因为 B 继承 A 的 printMe ⽅法
+
+最后⼀个函数 0x0000000104a80900 指向是 B 类的 sayHello,
+
+<img src="pic/JVM字节码从入门到精通/image-20211115163711289.png" alt="image-20211115163711289" style="zoom:50%;" />
+
+B 类 vtable 如下图所⽰
+
+<img src="pic/JVM字节码从入门到精通/image-20211115163729029.png" alt="image-20211115163729029" style="zoom:50%;" />
+
+vtable 是 Java 实现多态的基⽯，如果⼀个⽅法被继承和重写，会把 vtable 中指向⽗类的⽅法指针指向⼦类⾃⼰的实现。
+
+- Java ⼦类会继承⽗类的 vtable。Java 所有的类都会继承 java.lang.Object 类，Object 类有 5 个虚⽅法可以被继承和重写。当⼀个类不包含任何⽅法时，vtable 的长度也最⼩为 5，表⽰ Object 类的 5 个 虚⽅法 
+- final 和 static 修饰的⽅法不会被放到 vtable ⽅法表⾥ 
+- 当⼦类重写了⽗类⽅法，⼦类 vtable 原本指向⽗类的⽅法指针会被替换为⼦类的⽅法指针 
+- ⼦类的 vtable 保持了⽗类的 vtable 的顺序 
 
 
-## invokestatic
 
+下⾯我们在做⼀些实验，让 B 实现接⼜ MyInterface，同时在 B 中新增了⼀个 static ⽅法和⼀个 final ⽅法。
 
+```java
+public interface MyInterface { 
+  public void testMe(); 
+} 
+public abstract class A { 
+  public void printMe() { 
+    System.out.println("I am vim fun"); 
+  } 
+  public abstract void sayHello(); 
+} 
 
-## invokevirtual vs invokespecial
+public class B extends A implements MyInterface { 
+  @Override 
+  public void sayHello() { 
+    System.out.println("hello, i am child B"); 
+  } 
+  @Override 
+  public void testMe() { 
+    System.out.println("test me"); 
+  } 
+  public static void foo(){ } 
+  public final void testFinal() { }
+}
+```
 
+采⽤同样的⽅法，这时显⽰ B 类的 vtable ⼤⼩为 8，这 8 个⽅法的指针地址⽤ mem 指令可以进⾏查看
 
+<img src="pic/JVM字节码从入门到精通/image-20211115163926572.png" alt="image-20211115163926572" style="zoom:50%;" />
 
+可以看到 vtable 中 B 类的 static 和 final 的⽅法没有出现。
 
+<img src="pic/JVM字节码从入门到精通/image-20211115163957675.png" alt="image-20211115163957675" style="zoom:50%;" />
 
-# HSDB
+## 0x03 ⼩结
 
+作为上⼀篇⽂章的补充，这篇⽂章通过介绍 HSDB ⼯具来窥探 JVM 内存，通过 vtable 的例⼦深⼊理解了⽅法继承的细节以及多态的原理，当然还有很多有趣的事情可以⽤ HSDB 神器去发现，希望⼤家 都可以熟练掌握这个⼯具。
 
+## 参考⽂章
 
-# 匿名内部类
+- 笨神的⽂章：http://lovestblog.cn/blog/2014/06/28/hsdb-string/ 
+- R ⼤的⽂章：https://rednaxelafx.iteye.com/blog/1847971
+
+# 7. invokedynamic
+
+<img src="pic/JVM字节码从入门到精通/image-20211115164221165.png" alt="image-20211115164221165" style="zoom:50%;" />
+
+Java 虚拟机的指令集从 1.0 开始到 JDK7 之间的⼗余年间没有新增任何指令。但基于 JVM 的语⾔倒是百花齐放，但是 JVM 有诸多的限制，⼤部分情况下这些⾮ Java 的语⾔需要许多 trick 才能很好的⼯ 作。随着 JDK7 的发布，字节码指令集新增了⼀个重量级指令 invokedynamic。这个指令为为多语⾔在 JVM 上百花齐放提供了坚实的技术⽀撑。因为 invokedynamic 概念不是那么好理解，这篇⽂章专门讲 这个指令，希望能帮助你掌握。
+
+<img src="pic/JVM字节码从入门到精通/image-20211115165016076.png" alt="image-20211115165016076" style="zoom:50%;" />
+
+JDK7 中虽然在指令集中新增了这个指令，但是 javac 并不会⽣成 invokedynamic，直到 JDK8 lambda 表达式的出现，在 Java 中才第⼀次⽤上了这个指令。
+
+## 0x01 动态语⾔：变量⽆类型，变量值才有类型
+
+对于 JVM ⽽⾔都是强类型语⾔，它会在编译时检查传⼊参数的类型和返回值的类型，⽐如下⾯这段代码
+
+```java
+obj.println("hello world");
+```
+
+Java 语⾔中情况下，对应字节码如下
+
+```shell
+Constant pool: 
+#1 = Methodref 			#6.#15		// java/lang/Object."<init>":()V
+#4 = Methodref			#19.#20		// java/io/PrintStream.println:(Ljava/lang/String;)V
+
+0: getstatic #2 						// Field java/lang/System.out:Ljava/io/PrintStream;
+3: ldc #3 									// String Hello World
+5: invokevirtual #4					// Method java/io/PrintStream.println:(Ljava/lang/String;)V
+```
+
+可以看到 println 要求如下
+
+- 要调⽤的对象类：java.io.PrintStream 
+- ⽅法名必须是 println 
+- ⽅法参数必须是 (String) 
+- 函数返回值必须是 void
+
+如果当前类找不到符合条件的函数，会在其⽗类中继续查找，如果 obj 所属的类与 PrintStream 没有继承关系，就算 obj 所属的类有符合条件的函数，上述调⽤也不会成功（类型检查不会通过） 但是相同 的代码在 Groovy 或者 JavaScript 等语⾔中就不⼀样了，⽆论 obj 是何种类型，只有所属类包含函数名为 println，函数参数为(String)的函数，那么上述调⽤就会成功。这也是我们下⾯要讲到的「鸭⼦类 型」
+
+## 0x02 鸭⼦类型（Duck Typing）
+
+鸭⼦类型概念的名字来源于由 James Whitcomb Riley 提出的鸭⼦测试，可以这样表述： 当看到⼀只鸟⾛起来像鸭⼦、游泳起来像鸭⼦、叫起来也像鸭⼦，那么这只鸟就可以被称为鸭⼦
+
+在鸭⼦类型中，关注点在于对象的⾏为，能做什么；⽽不是关注对象所属的类型，不关注对象的继承关系
+
+以下⾯这段 Groovy 脚本为例
+
+```groovy
+class Duck { 
+  void fly() { println "duck flying" } 
+}
+
+class Airplane { 
+  void fly() { println "airplane flying" } 
+}
+
+class Whale { 
+  void swim() { println "Whale swim" } 
+}
+
+def liftOff(entity) { entity.fly() }
+
+liftOff(new Duck()) 
+liftOff(new Airplane()) 
+liftOff(new Whale())
+```
+
+输出： 
+
+```shell
+duck flying 
+airplane flying 
+groovy.lang.MissingMethodException: No signature of method: Whale.fly() is applicable for argument types: () values: []
+```
+
+我们可以看到 liftOff 函数，调⽤了⼀个传⼊对象的 fly ⽅法，但是它并不知道这个对象的类型，也不知道这个对象是否包含了 fly ⽅法。
+
+开始讲解 invokedynamic 之前需要先介绍⼀个核⼼的概念⽅法句柄（MethodHandle）。
+
+## 0x03 MethodHandle 是什么
+
+MethodHandle 又被称为⽅法句柄或⽅法指针， 是java.lang.invoke 包中的 ⼀个类，它的出现使得 Java 可以像其它语⾔⼀样把函数当做参数进⾏传递。MethodHandle 类似于反射中的 Method 类，但它⽐ Method 类要更加灵活和轻量级。 下⾯以⼀个实际的例⼦来看 MethodHandle 的⽤法
+
+```java
+public class Foo {
+	public void print(String s) { 
+    System.out.println("hello, " + s); 
+  } 
+  public static void main(String[] args) throws Throwable {
+		Foo foo = new Foo();
+		MethodType methodType = MethodType.methodType(void.class, String.class); 			
+    MethodHandle methodHandle = MethodHandles.lookup().findVirtual(Foo.class, "print" , methodType); 
+    methodHandle.invokeExact(foo, "world" );
+	}
+}
+```
+
+运⾏输出 
+
+```shell
+hello, world
+```
+
+使⽤ MethodHandle 的⽅法的步骤是:
+
+- 创建 MethodType 对象。MethodType ⽤来表⽰⽅法签名，每个 MethodHandle 都有⼀个 MethodType 实例，⽤来指定⽅法的返回值类型和各个参数类型 
+- 调⽤ MethodHandles.lookup 静态⽅法返回 MethodHandles.Lookup对象，这个对象是查找的上下⽂，根据⽅法的不同类型通过 findStatic、findSpecial、findVirtual 等⽅法查找⽅法签名为 MethodType 的 ⽅法句柄 
+- 拿到⽅法句柄以后就可以执⾏了。通过传⼊⽬标⽅法的参数，使⽤invoke或者invokeExact就可以进⾏⽅法的调⽤
+
+## 0x04 什么是 invokedynamic
+
+援引 JRuby 作者给 invokedynamic 下⼀个定义：
+
+> invokedynamic is a user-definable bytecode，You decide how the JVM implements it。 
+
+回顾上⼀节的内容
+
+```shell
+invokestatic: 
+System.currentTimeMillis() 
+Math.abs(-100)
+---
+invokevirtual:
+"hello, world".toUpperCase()
+---
+invokespecial: 
+new ArrayList()
+---
+invokeinterface: 
+myRunnable.run()
+```
+
+这 4 条 invoke* 指令分配规则固化在了虚拟机中，invokedynamic 则把如何查找⽬标⽅法的决定权从虚拟机下放到了具体的⽤户代码中。
+
+invokedynamic 的调⽤流程如下
+
+- JVM ⾸次执⾏ invokedynamic 调⽤时会调⽤引导⽅法（Bootstrap Method） 
+- 引导⽅法返回 CallSite 对象，CallSite 内部根据⽅法签名进⾏⽬标⽅法查找。它的 getTarget ⽅法返回⽅法句柄（MethodHandle）对象。 
+- 在 CallSite 没有变化的情况下，MethodHandle 可以⼀直被调⽤，如果 CallSite 有变化的话重新查找即可。以 def add(a, b) { a + b } 为例，如果在代码中⼀开始使⽤两个 int 参数进⾏调⽤，那么极 有可能后⾯很多次调⽤还会继续使⽤两个 int，这样就不⽤每次都重新选择⽬标⽅法。
+
+它们之间的关系如下图所⽰：
+
+<img src="pic/JVM字节码从入门到精通/image-20211115172947646.png" alt="image-20211115172947646" style="zoom:75%;" />
+
+## 0x05 Groovy 与 invokedynamic
+
+以下⾯的 groovy 代码为例来讲解 invokedynamic 在 Groovy 语⾔上的应⽤。
+
+```groovy
+Test.groovy 
+def add(a, b) {
+	new Exception().printStackTrace()
+	return a + b 
+}
+
+add("hello" , "world" )
+```
+
+默认情况下 invokedynamic 在 Groovy 上并未启⽤。如果需要使⽤需要加上 --indy选项，使⽤groovy --indy Test.groovy 进⾏编译。⽣成的 Test.class 对应的字节码如下：
+
+```shell
+public java.lang.Object run(); 
+descriptor: ()Ljava/lang/Object; 
+flags: ACC_PUBLIC 
+Code:
+	stack=3, locals=1, args_size=1 
+	0: aload_0 
+	1: ldc 						#44 		// String hello
+	3: ldc 						#46 		// String world
+	5: invokedynamic  #52, 0 	// InvokeDynamic #1:invoke:(LTest;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
+ 10: areturn
+-----------------Constant pool:
+#1 = Utf8 Test
+...省略掉部分字节码...
+#52 = InvokeDynamic 	#1:#51	// #1:invoke:(LTest;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
+-----------------
+BootstrapMethods:
+...省略掉部分字节码...
+1: #34 invokestatic org/codehaus/groovy/vmplugin/v7/IndyInterface.bootstrap:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;I)Ljava/lang Method arguments:
+
+#48 add 
+#49 2
+```
+
+可以看到 add("hello", "world") 调⽤被翻译为了 invokedynamic 指令，第⼀次参数是常量池中的 #52，这个条⽬又指向了 BootstrapMethods 中的 #1，调⽤了静态⽅法IndyInterface.bootstrap，返回值是 ⼀个 CallSite 对象，这个函数签名如下：
+
+```shell
+public static CallSite bootstrap( 
+	Lookup caller, // the caller 
+	String callType, // the type of the call 
+	MethodType type, // the MethodType 
+	String name, // the real method name 
+	int flags // call flags ) { 
+	}
+```
+
+其中 callType 为调⽤类型，是枚举类 CALL_TYPES 的⼀种，这⾥为CALL_TYPES.METHOD("invoke") ，name 为实际调⽤的函数名，这⾥为"add"。
+
+这个函数内部调⽤了 realBootstrap 函数，这个函数返回了 CallSite 对象，这个 CallSite 的⽬标⽅法句柄（MethodHandle）真正调⽤了 selectMethod ⽅法，这个⽅法在运⾏期选择合适的⽅式进⾏调⽤。
+
+<img src="pic/JVM字节码从入门到精通/image-20211115173552971.png" alt="image-20211115173552971" style="zoom:50%;" />
+
+selectMethod ⽅法内部则是通过 MethodHandle 的 invokeExact ⽅法执⾏了最终的⽅法调⽤。
+
+ 简化上述过程为伪代码就是
+
+```groovy
+public static void main(String[] args) throws Throwable { 
+  MethodHandles.Lookup lookup = MethodHandles.lookup(); 
+  MethodType mt = MethodType.methodType(Object.class, Object.class, Object.class); 	
+  CallSite callSite = IndyInterface.bootstrap(lookup, "invoke", mt, "add", 0); 
+  MethodHandle mh = callSite.getTarget(); 
+  mh.invoke(obj, "hello" , "world" ); 
+}
+```
+
+Groovy 采⽤ invokedynamic 指令有哪些好处?
+
+- 标准化。使⽤ Bootstrap Method、CallSite、MethodHandle 机制使得动态调⽤的⽅式得到统⼀ 
+- 保持了字节码层的统⼀和向后兼容。把动态⽅法的分派逻辑下放到语⾔实现层，未来版本可以很⽅便的进⾏优化、修改
+- ⾼性能。接近原⽣ Java 调⽤的性能，也可以享受到 JIT 优化等 
+
+有⼈会有疑问，invokedynamic 只能在动态语⾔上吗？其实不是的，invokedynamic 是⼀种⽅法动态分派的⽅式，除了⽤于动态语⾔还有其他很多的⽤途，⽐如下⼀篇⽂章我们要讲的 Java 的 lambda 表达 式。
+
+## 0x06 ⼩结
+
+这篇⽂章主要介绍了 invokedynamic 指令的原理。invokedynamic 其实是⼀种调⽤⽅法的新⽅式，它⽤来告诉 JVM 可以延迟确认最终要调⽤的哪个⽅法。⼀开始 invokedynamic 并不知道要调⽤什么⽬标⽅ 法。第⼀次调⽤时引导⽅法（Bootstrap Method）会被调⽤，由这个引导⽅法决定哪个⽬标⽅法进⾏调⽤。
+
+# 8. Lambda 表达式与字节码的关系
 
 
 
