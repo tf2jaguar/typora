@@ -359,7 +359,7 @@ flags: ACC_PUBLIC
 Code:
 	stack=1, locals=1, args_size=1 
 	0: aload_0 
-	1: getfield #2 / Field name:Ljava/lang/String; 
+	1: getfield #2 		// Field name:Ljava/lang/String; 
 	4: areturn
 ```
 
@@ -682,7 +682,7 @@ long lookup_time_cost = nlabels;
 // opcode = 16 <= 18 ? tableswitch : lookupswich
 
 int opcode = nlabels > 0 &&
-table_space_cost + 3 * table_time_cost &lt;= lookup_space_cost + 3 * lookup_time_cost
+table_space_cost + 3 * table_time_cost <= lookup_space_cost + 3 * lookup_time_cost
 ? tableswitch : lookupswitch;
 ```
 
@@ -714,9 +714,9 @@ ScoreCalculator calculator = new ScoreCalculator();
 对应的字节码如下：
 
 ```shell
-0: new #2 					// class ScoreCalculator
+0: new 						#2 			// class ScoreCalculator
 3: dup 
-4: invokespecial #3	// Method ScoreCalculator."<init>":()V
+4: invokespecial  #3			// Method ScoreCalculator."<init>":()V
 
 7: astore_1
 ```
@@ -740,7 +740,8 @@ public class Initializer {
   static int a; 
   static int b; 
   static {
-    a = 1; b = 2; 
+    a = 1; 
+    b = 2; 
   } 
 } 
 ```
@@ -789,10 +790,10 @@ public class B extends A {
 ```shell
 public B();
 	0: aload_0 	
-	1: invokespecial #1 		// Method A."<init>":()V
-	4: getstatic #2 				// Field java/lang/System.out:Ljava/io/PrintStream;
-	7: ldc #3 							// String B Instance
-	9: invokevirtual #4 		// Method java/io/PrintStream.println:(Ljava/lang/String;)V
+	1: invokespecial 		#1 		// Method A."<init>":()V
+	4: getstatic 				#2 		// Field java/lang/System.out:Ljava/io/PrintStream;
+	7: ldc 							#3 		// String B Instance
+	9: invokevirtual 		#4 		// Method java/io/PrintStream.println:(Ljava/lang/String;)V
  12: return
 ```
 
@@ -1063,7 +1064,7 @@ public class Son extends Father {
 前⾯我们看到过⼏个关于⽅法调⽤的指令了。⽐如上篇⽂章有讲到的对象实例初始化<init>函数由 invokespecial 调⽤。这篇⽂章我们将介绍关于⽅法调⽤的五个指令：
 
 - invokestatic：⽤于调⽤静态⽅法
--  invokespecial：⽤于调⽤私有实例⽅法、构造器，以及使⽤ super 关键字调⽤⽗类的实例⽅法或构造器，和所实现接⼜的默认⽅法 
+-  invokespecial：⽤于调⽤私有实例⽅法、构造器，以及使⽤ super 关键字调⽤⽗类的实例⽅法或构造器，和所实现接口的默认⽅法 
 - invokevirtual：⽤于调⽤⾮私有实例⽅法
 -  invokeinterface：⽤于调⽤接⼜⽅法
 - invokedynamic：⽤于调⽤动态⽅法
@@ -1749,15 +1750,497 @@ metafactory ⽅法的内部细节是整个 lambda 表达式最复杂的地⽅。
 
 <img src="pic/JVM字节码从入门到精通/image-20211115201123645.png" alt="image-20211115201123645" style="zoom:50%;" />
 
-# i++ vs ++i
+跟进 InnerClassLambdaMetafactory 类，看到它在默默⽣成新的内部类，类名的规则是ClassName$$Lambda$1，其中 ClassName 是 lambda 所在的类名，后⾯的数字按⽣成的顺序依次递增。
+
+<img src="pic/JVM字节码从入门到精通/image-20211115220832507.png" alt="image-20211115220832507" style="zoom:40%;" />
+
+同样可以使⽤打印的⽅式看⼀下具体⽣成的类名
+
+```java
+Runnable r = ()->{ 
+  System.out.println("hello, lambda"); 
+};
+
+System.out.println(r.getClass().getName());
+```
+
+输出： 
+
+```shell
+Test$$Lambda$1/1108411398
+```
+
+其中斜杠/后⾯的数字 1108411398 是类对象的 hashcode 值。
+
+InnerClassLambdaMetafactory 这个类的静态初始化⽅法块⾥有⼀个开关可以选择是否把⽣成的类 dump 到磁盘中。
+
+```java
+// For dumping generated classes to disk, for debugging purposes private static final ProxyClassesDumper dumper; 
+static {
+	final String key = "jdk.internal.lambda.dumpProxyClasses"; 
+	String path = AccessController.doPrivileged( 
+    new GetPropertyAction(key), null, new PropertyPermission(key , "read"));
+	dumper = (null == path) ? null : ProxyClassesDumper.getInstance(path); 
+}
+```
+
+使⽤java -Djdk.internal.lambda.dumpProxyClasses=. Test运⾏ Test 类会发现在运⾏期间⽣成了⼀个新的内部类： Test$$Lambda$1.class。这个类正是由InnerClassLambdaMetafactory 使⽤ ASM 字节码 技术动态⽣成的，只是默认情况看不到⽽已。
+
+这个类实现了 Runnable 接⼜，并在 run ⽅法⾥调⽤了 Test 类的静态⽅法lambda$main$0()。
+
+把这个类的字节码⼈⾁翻译过来是下⾯这样
+
+```java
+final class Test$$Lambda$1 implements Runnable { 
+  @Override 
+  public void run() { 
+    Test.lambda$main$0(); 
+  } 
+}
+```
+
+整个过程就⽐较明朗了:
+
+- lambda 表达式声明的地⽅会⽣成⼀个 invokedynamic 指令，同时编译器⽣成⼀个对应的引导⽅法（Bootstrap Method） 
+- 第⼀次执⾏ invokedynamic 指令时，会调⽤对应的引导⽅法（Bootstrap Method），该引导⽅法会调⽤ LambdaMetafactory.metafactory ⽅法动态⽣成内部类 
+- 引导⽅法会返回⼀个动态调⽤ CallSite 对象，这个 CallSite 会链接最终调⽤的实现了 Runnable 接⼜的内部类 lambda 表达式中的内容会被编译成静态⽅法，前⾯动态⽣成的内部类会直接调⽤该静态⽅法 
+- 真正执⾏ lambda 调⽤的还是⽤ invokeinterface 指令
+
+## 0x03 为什么 Java 8 的 Lambda 表达式要基于 invokedynamic
+
+关于为什么⽤ invokedynamic 来实现 Lambda，Oracle 的开发者专门写了⼀篇⽂章 Translation of Lambda Expressions，介绍了 Java 8 Lambda 设计时的考虑以及实现⽅法。 ⽂中提到 Lambda 表达式可以通过 内部类、method handle、dynamic proxies 等⽅式实现，但是这些⽅法各有优劣。实现 Lambda 表达式需要达成两个⽬标：
+
+- 为未来的优化提供最⼤的灵活性 
+- 保持类⽂件字节码格式的稳定
+
+使⽤ invokedynamic 可以很好的兼顾这两个⽬标。
+
+原⽂如下
+
+> here are a number of ways we might represent a lambda expression in bytecode, such as inner classes, method handles, dynamic proxies, and others. Each of these approaches has pros and cons. In selecting a strategy, there are two competing goals: maximizing flexibility for future optimization by not committing to a specific strategy, vs providing stability in the classfile representation.
+
+invokedynamic 与之前四个 invoke 指令最⼤的不同就在于它把⽅法分派的逻辑从虚拟机层⾯下放到程序语⾔。 lambda 表达式采⽤的⽅式是不在编译期间就⽣成匿名内部类，⽽是提供了⼀个稳定的字节码 ⼆进制表⽰规范，对⽤户⽽⾔看到的只有 invokedynamic 这样⼀个⾮常简单的指令。⽤ invokedynamic 来实现就是把翻译的逻辑隐藏在 JDK 的实现中，后续想替换实现⽅式⾮常简单，只⽤修改 LambdaMetafactory.metafactory ⾥⾯的逻辑就可以了，这种⽅法把 lambda 翻译的策略由编译期间推迟到运⾏时。
+
+## 0x04 ⼩结
+
+lambda 表达式与普通的匿名内部类的实现⽅式不⼀样，在编译阶段只是新增了⼀个 invokedynamic 指令，并没有在编译期间⽣成匿名内部类，lambda 表达式的内容会被编译成⼀个静态⽅法。在运⾏时 LambdaMetafactory.metafactory 这个⼯⼚⽅法来动态⽣成⼀个内部类 class，该内部类会调⽤前⾯⽣成的静态⽅法。 lambda 表达式最终还是会⽣成⼀个内部类，只不过是不是在编译期间⽽是在运⾏时，未 来的 JDK 会怎么实现 Lambda 表达式可能还会有变化。
+
+## 0x05 思考题
+
+下⾯的两段代码分别会⽣成多少个内部类？为什么?
+
+代码⽚段 1
+
+```java
+for (int i = 0; i < 10; i++) { 
+  Runnable r = () -> { 
+    System.out.println("hello, lambda"); 
+  }; 
+  r.run(); 
+}
+```
+
+代码⽚段 2
+
+```java
+Runnable r1 = () -> { 
+  System.out.println("hello, lambda"); 
+}; 
+r1.run();
+
+Runnable r2 = () -> { 
+  System.out.println("hello, lambda"); 
+}; 
+r2.run();
+```
 
 
 
-# syntactic sugar
+---
 
 
 
-# try-catch-finally 
+# 9. i++ vs ++i
+
+## 0x01 看⼀道笔试题
+
+```java
+public static void foo() { 
+  int i = 0; 
+  for (int j = 0; j < 50; j++) 
+    i = i++; 
+  System.out.println(i); 
+}
+```
+
+输出结果是 0，⽽不是 50
+
+关于 i++ 和 ++i 的区别，稍微有经验的程序员都或多或少都是了解的。听过了很多道理，依旧过不好这⼀⽣，我们从字节码的⾓度来彻底分析⼀下
+
+```shell
+public static void foo(); 
+	0: iconst_0 
+	1: istore_0 
+	2: iconst_0 
+	3: istore_1 
+	4: iload_1 
+	5: bipush 				50
+	7: if_icmpge			21
+
+ 10: iload_0 
+ 11: iinc 					0, 1
+ 14: istore_0
+
+ 15: iinc 					1, 1
+ 18: goto						4
+
+ 21: getstatic 			#3 				// Field java/lang/System.out:Ljava/io/PrintStream;
+ 24: iload_0 
+ 25: invokevirtual 	#4 				// Method java/io/PrintStream.println:(I)V
+ 28: return
+```
+
+对应i = i++; 的字节码是 10 ~ 14 ⾏：
+
+- 10：iload_0 把局部变量表 slot = 0 的变量(i)加载到操作数栈上 
+- 11：iinc 0, 1 对局部变量表slot = 0 的变量(i)直接加 1，但是这时候栈顶的元素没有变化，还是 0 
+- 14：istore_0 将栈顶元素出栈赋值给局部变量表 slot = 0 的变量，也就是 i。在这时，局部变量 i 又被赋值为 0 了，前⾯的 iinc 指令对 i 的加⼀操作前功尽弃。
+
+<img src="pic/JVM字节码从入门到精通/image-20211115221943471.png" alt="image-20211115221943471" style="zoom:45%;" />
+
+如果要⽤伪代码来理解i = i++ ，应该是下⾯这样的
+
+```shell
+tmp = i; 
+i = i + 1; 
+i = tmp;
+```
+
+## 0x02 ++i 又会是怎么样
+
+把代码稍作修改，如下
+
+```java
+public static void foo() { 
+  int i = 0; 
+  for (int j = 0; j < 50; j++) 
+    i = ++i; 
+  System.out.println(i); 
+}
+```
+
+来看对应的字节码
+
+```shell
+public static void foo(); 
+	0: iconst_0 
+	1: istore_0 
+	2: iconst_0 
+	3: istore_1 
+	4: iload_1 
+	5: bipush 				50 
+	7: if_icmpge 			21
+
+ 10: iinc 					0, 1
+ 13: iload_0 
+ 14: istore_0
+
+ 15: iinc 					1, 1
+ 18: goto						4
+
+ 21: getstatic 			#3 			// Field java/lang/System.out:Ljava/io/PrintStream;
+ 24: iload_0 
+ 25: invokevirtual 	#4 			// Method java/io/PrintStream.println:(I)V
+ 28: return
+```
+
+可以看到i = ++i; 对应的字节码还是 10 ~ 14 ⾏，与 i++ 的字节码对⽐如下图：
+
+<img src="pic/JVM字节码从入门到精通/image-20211115222259235.png" alt="image-20211115222259235" style="zoom:45%;" />
+
+可以看出i = ++i; 先对局部变量表 slot = 0 的变量加 1，然后才把它加载到操作数栈上，随后又从操作数栈上出栈赋值给了局部变量表，最后写回去的值也是最新的值。 画出整个过程的局部变量表和操作数栈的变化如下：
+
+<img src="pic/JVM字节码从入门到精通/image-20211115222336534.png" alt="image-20211115222336534" style="zoom:45%;" />
+
+如果要⽤伪代码来理解i = ++i ，应该是下⾯这样的
+
+```shell
+i = i + 1; 
+tmp = i; 
+i = tmp;
+```
+
+## 0x03 看⼀道难⼀点的题⽬
+
+```java
+public static void bar() { 
+  int i = 0; 
+  i = i++ + ++i; 
+  System.out.println("i=" + i);
+}
+```
+
+输出是什么？ 
+
+同样我们以字节码的⾓度来分析，add 指令的第⼀个参数值为 0，第⼆个参数值为 2，最终输出的结果为 2，详细的分析过程我画了⼀个简单的过程图，如下：
+
+```shell
+public static void bar(); 
+	0: iconst_0 
+	1: istore_0
+
+	2: iload_0 
+	3: iinc 				0, 1
+	6: iinc 				0, 1
+	9: iload_0 
+	10: iadd 
+	11: istore_0
+```
+
+<img src="pic/JVM字节码从入门到精通/image-20211115222559975.png" alt="image-20211115222559975" style="zoom:50%;" />
+
+⽤伪代码的⽅式就是，会不会更好理解⼀些?
+
+```shell
+i = 0;
+tmp1 = i; 
+i = i + 1;
+
+i = i + 1 
+tmp2 = i;
+
+tmpSum = tmp1 + tmp2;
+
+i = tmpSum;
+```
+
+## 0x03 ⼩结
+
+这篇⽂章，我们通过 i++ 与 ++i 字节码的不同讲述了两者的区别，希望能对你后续笔试遇到类似的题⽬有所帮助。 
+
+## 0x04 思考
+
+留⼀道作业题给你，下⾯的代码输出是什么？你可以画出各阶段的过程图吗？
+
+```java
+public static void foo() { 
+  int i = 0; 
+  i = ++i + i++ + i++ + i++; 
+  System.out.println("i=" + i); 
+}
+```
+
+
+
+---
+
+
+
+# 10. switch-case
+
+## 0x01 ⼀个⼩ demo
+
+前⾯我们已经知道了，switch-case 依据 case 值的稀疏程度，分别由两个指令 tableswitch 和 lookupswitch 实现，但这两个指令都只⽀持整型值。那怎么样让 String 类型的值也⽀持 switch-case 呢？
+
+```java
+public int test(String name) { 
+  switch (name) { 
+    case "Java":
+			return 100;
+		case "Kotlin":
+			return 200;
+		default:
+			return -1;
+	} 
+}
+```
+
+我们直接来看字节码
+
+```shell
+0: aload_1 
+1: astore_2 
+2: iconst_m1 
+3: istore_3
+
+4: aload_2 
+5: invokevirtual #2 // Method java/lang/String.hashCode:()I 
+8: lookupswitch { // 2
+			-2041707231: 	50 // 对应 "Kotlin".hashCode() 
+					2301506:  36 // 对应 "Java".hashCode() 
+					default: 	61 
+			}
+36: aload_2 
+37: ldc 						#3 			// String Java
+39: invokevirtual 	#4 			// Method java/lang/String.equals:(Ljava/lang/Object;)Z
+42: ifeq 61 
+45: iconst_0 
+46: istore_3 
+47: goto 61
+
+50: aload_2 
+51: ldc 						#5 			// String Kotlin
+53: invokevirtual 	#4 			// Method java/lang/String.equals:(Ljava/lang/Object;)Z
+56: ifeq 61 
+59: iconst_1 
+60: istore_3
+
+61: iload_3 
+62: lookupswitch { // 2 
+				0: 88 
+				1: 91 
+	default: 95 
+	}
+
+// 88 ~ 90 
+88: bipush 						100
+90: ireturn
+
+91: sipush 						200
+94: ireturn
+
+95: iconst_m1 
+96: ireturn
+```
+
+- 0 ~ 3：做⼀些初始化操作，把⼊参 name 赋值给局部变量表下标为 2 的变量，记为 tmpName ，初始化局部变量表 3 位置的变量为 -1，记为 matchIndex 
+- 4 ~ 8：对 tmpName 调⽤了 hashCode 函数，得到⼀个整型值。因为⼀般⽽⾔ hash 都⽐较离散，所以没有选⽤ tableswitch ⽽是⽤ lookupswitch 来作为 switch case 的实现。 
+- 36 47：如果 hashCode 等于 "Java".hashCode() 会跳转到这部分字节码。⾸先把字符串进⾏真正意义上的 equals ⽐较，看是否相等，是否相等使⽤的是 ifeq 指令， ifeq 这个指令语义上有点绕，ifeq 的含义是ifeq 0则跳转到对应字节码⾏处，实际上是等于 false 跳转。这⾥如果相等则把 matchIndex 赋值为 0 
+- 61 ~ 96：进⾏最后的 case 分⽀执⾏。这⼀段⽐较好理解，不再继续做分析。 
+
+结合上⾯的字节码解读，我们可以推演出对应的 Java 代码实现
+
+```java
+public int test_translate(String name) {
+	String tmpName = name; 
+  int matchIndex = -1; 
+  switch (tmpName.hashCode()) { 
+    case -2041707231:
+			if (tmpName.equals("Kotlin")) { 
+        matchIndex = 1; 
+      } 
+      break; 
+    case 2301506:
+			if (tmpName.equals("Java")) { 
+        matchIndex = 0; 
+      } 
+      break; 
+    default:
+			break;
+	} 
+	switch (matchIndex) { 
+  	case 0:
+			return 100; 
+	  case 1:
+			return 200; 
+	  default: 
+  	  return -1;
+	}
+}
+```
+
+## 0x02 hashCode 冲突如何处理
+
+有⼈可能会想，hashCode 冲突的时候要怎么样处理，⽐如 "Aa" 和 "BB" 的 hashCode 都是 2112。
+
+```shell
+public int testSameHash(java.lang.String); 
+descriptor: (Ljava/lang/String;)I 
+flags: ACC_PUBLIC 
+Code:
+	stack=2, locals=4, args_size=2 
+	0: aload_1 
+	1: astore_2 
+	2: iconst_m1 
+	3: istore_3
+
+	4: aload_2 
+	5: invokevirtual 			#2 		// Method java/lang/String.hashCode:()I
+	8: lookupswitch { // 1 
+				2112: 28
+		 default: 53
+			}
+
+	28: aload_2 
+	29: ldc 							#3 		// String BB
+	31: invokevirtual 		#4 		// Method java/lang/String.equals:(Ljava/lang/Object;)Z
+	34: ifeq 42 
+	37: iconst_1 
+	38: istore_3 
+	39: goto 53
+
+	42: aload_2 
+	43: ldc 							#5 		// String Aa
+	45: invokevirtual 		#4 		// Method java/lang/String.equals:(Ljava/lang/Object;)Z
+	48: ifeq 53 
+	51: iconst_0 
+	52: istore_3
+
+	53: iload_3 
+	54: lookupswitch { // 2 
+					0: 80 
+					1: 83 
+		default: 87 
+			} 
+	80: bipush 100 
+	82: ireturn 
+	83: sipush 200 
+	86: ireturn 
+	87: iconst_m1 
+	88: ireturn
+```
+
+可以看到 34 ⾏ 在 hashCode 冲突的情况下，JVM 的处理不过是多⼀次字符串相等的⽐较。与 "BB" 不相等的情况，会继续判断是否等于 "Aa"，翻译为 Java 源代码如下：
+
+```java
+public int testSameHash_translate(String name) { 
+  String tmpName = name; 
+  int matchIndex = -1;
+
+	switch (tmpName.hashCode()) {
+		case 2112:
+			if (tmpName.equals("BB")) { 
+        matchIndex = 1; 
+      } else if (tmpName.equals("Aa")) { 
+        matchIndex = 0; 
+      } 
+      break; 
+    default:
+      break;
+	}
+
+	switch (matchIndex) { 
+    case 0:
+			return 100; 
+    case 1:
+      return 200; 
+    default:
+      return -1; 
+  }
+}
+```
+
+## 0x03 ⼩结
+
+总结⼀下，JDK7 引⼊的 String 的 switch 实现流程分为下⾯⼏步：
+
+1. 计算字符串 hashCode
+
+2. 使⽤ lookupswitch 对整型 hashCode 进⾏分⽀
+
+3. 对相同 hashCode 值的字符串进⾏最后的字符串匹配
+
+4. 执⾏ case 块代码
+
+## 0x04 思考
+
+最后，给你留两道思考题
+
+1. Java 的 hashCode 冲突的概率其实是很⼤的，其底层原因是什么？
+
+2. 你可以随意构造两个 hashCode 相同的字符串吗？它们有什么规律
+
+# 11. try-catch-finally 
 
 
 
