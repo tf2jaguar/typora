@@ -101,7 +101,7 @@ public class Hello {
 到此为⽌，默认构造器函数就讲完了，接下来，我们来看 9 ~ 14 ⾏的 main 函数 
 
 - 11 ⾏：getstatic #2，getstatic 获取指定类的静态域，并将其值压⼊栈顶，#2 代表常量池中的第 2 个，这⾥表⽰的是java/lang/System.out:Ljava/io/PrintStream;，其实就是java.lang.System 类的静态 变量 out（类型是 PrintStream） 
-- 12 ⾏：ldc #3、，ldc ⽤来将常量从运⾏时常量池压栈到操作数栈，#3 代表常量池的第三个（字符串 Hello, World） 
+- 12 ⾏：ldc #3，ldc ⽤来将常量从运⾏时常量池压栈到操作数栈，#3 代表常量池的第三个（字符串 Hello, World） 
 - 13 ⾏：invokevirtual #4，invokevirutal 指令调⽤⼀个对象的实例⽅法，#4 表⽰ PrintStream.println(String) 函数引⽤，并把栈顶两个元素出栈
 
 ### -p 选项
@@ -215,8 +215,6 @@ end
 ```
 
 基于寄存器的 add 指令直接把寄存器 R0 和 R1 相加，结果保存在寄存器 R2 中。 
-
-
 
 基于栈和寄存器的指令集各有优缺点，基于栈的指令集移植性更好，代码更加紧凑、编译器实现更加简单，但完成相同功能所需的指令数⼀般⽐寄存器架构多，需要频繁的⼊栈出栈，栈架构指令集的执 ⾏速度会相对⽽⾔慢⼀些。
 
@@ -344,7 +342,8 @@ Start Length Slot Name Signature
 ## 0x03 从⼆进制看 class ⽂件和字节码
 
 ```java
-public class Get { String name;
+public class Get { 
+  String name;
 	public String getName() { 
 	  return name; 
 	}
@@ -1606,9 +1605,149 @@ Groovy 采⽤ invokedynamic 指令有哪些好处?
 
 # 8. Lambda 表达式与字节码的关系
 
+## 0x01 测试匿名内部类的实现
+
+```java
+public static void main(String[] args) { 
+  Runnable r1 = new Runnable() { 
+    @Override 
+    public void run() { 
+      System.out.println("hello, inner class"); 
+    } 
+  }; 
+  r1.run(); 
+}
+```
+
+使⽤ javac 进⾏编译会⽣成两个 class ⽂件Test.class和Test$1.class 
+
+main 函数简化过的字节码如下： 
+
+```shell
+public static void main(java.lang.String[]); 
+Code:
+	stack=2, locals=2, args_size=1 
+		0: new 							#2 		// class Test$1 
+		3: dup 
+		4: invokespecial 		#3 		// Method Test$1."<init>":()V 
+		7: astore_1 
+		8: aload_1 
+		9: invokeinterface 	#4, 1 // InterfaceMethod java/lang/Runnable.run:()V 
+	 14: return
+```
+
+- 第 0 ~ 7 ⾏：新建Test$1实例对象 
+- 第 8 ~ 9 ⾏：执⾏ Test$1 对象的 run ⽅法
+
+整个过程的伪代码就是
+
+```java
+class Test$1 implements Runnable { 
+  public Test$1(Test test) { }
+
+	@Override 
+  public void run() { 
+    System.out.println("hello, inner class"); 
+  }
+
+} 
+public class Test { 
+  public static void main(String[] args) { 
+    Runnable r1 = new Test$1(this); r1.run(); 
+  } 
+}
+```
+
+因此可以得出结论：匿名内部类是在编译期间⽣成新的 class ⽂件来实现的。
+
+## 0x02 测试 lambda 表达式
+
+还是上⾯的代码，修改为 lambda 的⽅式
+
+```java
+public static void main(String[] args) { 
+  Runnable r = ()->{System.out.println("hello, lambda");}; 
+  r.run(); 
+}
+```
+
+继续使⽤ javac 编译，发现这次只⽣成了 Test.class ⼀个类⽂件，并没有⽣成匿名内部类，
+
+使⽤ javap -p -s -c -v -l Test 查看对应字节码如下
+
+```shell
+public static void main(java.lang.String[]); 
+descriptor: ([Ljava/lang/String;)V 
+flags: ACC_PUBLIC, ACC_STATIC 
+Code:
+	stack=1, locals=2, args_size=1 
+	0: invokedynamic 		#2, 0 	// InvokeDynamic #0:run:()Ljava/lang/Runnable; 
+	5: astore_1 
+	6: aload_1 
+	7: invokeinterface 	#3, 1 	// InterfaceMethod java/lang/Runnable.run:()V 
+ 12: return
+
+private static void lambda$main$0(); 
+Code:
+	0: getstatic 				#4 			// Field java/lang/System.out:Ljava/io/PrintStream;
+	3: ldc 							#5 			// String hello, lambda
+	5: invokevirtual 		#6 			// Method java/io/PrintStream.println:(Ljava/lang/String;)V
+	8: return
+```
+
+出乎意料的出现了⼀个名为 lambda$main$0 的静态⽅法，这段字节码⽐较简单，⼈⾁翻译⼀下就是
+
+```java
+private static void lambda$main$0() { 
+  System.out.println("hello, lambda"); 
+}
+```
+
+这⾥ main 函数中出现了上⼀节最后介绍的神奇指令 invokedynamic。第 0 ⾏中 #2 表⽰常量池中#2，它又指向了#0:#23
+
+```shell
+Constant pool:
+	#1 = Methodref 			#8.#18		// java/lang/Object."<init>":()V 
+	#2 = InvokeDynamic  #0:#23		// #0:run:()Ljava/lang/Runnable;
+	...
+	#23 = NameAndType		#35:#36		// run:()Ljava/lang/Runnable;
+
+BootstrapMethods:
+	0: #20 invokestatic java/lang/invoke/LambdaMetafactory.metafactory:(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/la 
+	Method arguments:
+		#21 ()V 
+		#22 invokestatic Test.lambda$main$0:()V 
+		#21 ()V
+```
+
+其中#0是⼀个特殊的查找，对应 BootstrapMethods 中的 0 ⾏，可以看到这是⼀个对静态⽅法 LambdaMetafactory.metafactory() 的调⽤，它的返回值是 java.lang.invoke.CallSite 对象，这个对象代表了真正执 ⾏的⽬标⽅法调⽤。
 
 
 
+核⼼的 metafactory 函数定义如下
+
+```shell
+public static CallSite metafactory( 
+	MethodHandles.Lookup caller, 
+	String invokedName, 
+	MethodType invokedType, 
+	MethodType samMethodType, 
+	MethodHandle implMethod, 
+	MethodType instantiatedMethodType 
+)
+```
+
+各个参数的含义如下
+
+- caller：JVM 提供的查找上下⽂
+-  invokedName：表⽰调⽤函数名，在本例中 invokedName 为 "run" 
+- samMethodType：函数式接⼜定义的⽅法签名（参数类型和返回值类型），本例中为 run ⽅法的签名 "()void" 
+- implMethod：编译时⽣成的 lambda 表达式对应的静态⽅法invokestatic Test.lambda$main$0 
+- instantiatedMethodType：⼀般和 samMethodType 是⼀样或是它的⼀个特例，在本例中是 "()void"
+
+metafactory ⽅法的内部细节是整个 lambda 表达式最复杂的地⽅。它的源码如下
+
+<img src="pic/JVM字节码从入门到精通/image-20211115201123645.png" alt="image-20211115201123645" style="zoom:50%;" />
 
 # i++ vs ++i
 
