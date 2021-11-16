@@ -703,6 +703,8 @@ table_space_cost + 3 * table_time_cost <= lookup_space_cost + 3 * lookup_time_co
 
 # 4. 对象相关字节码
 
+<img src="pic/JVM字节码从入门到精通/image-20211116120837729.png" alt="image-20211116120837729" style="zoom:50%;" />
+
 ## 0x01 new, \<init> & \<clinit>
 
 在 Java 中 new 是⼀个关键字，在字节码中也有⼀个指令 new。当我们创建⼀个对象时，背后发⽣了哪些事情呢？
@@ -1061,12 +1063,14 @@ public class Son extends Father {
 
 # 5. invokeXXX 指令
 
+<img src="pic/JVM字节码从入门到精通/image-20211116120811235.png" alt="image-20211116120811235" style="zoom:50%;" />
+
 前⾯我们看到过⼏个关于⽅法调⽤的指令了。⽐如上篇⽂章有讲到的对象实例初始化<init>函数由 invokespecial 调⽤。这篇⽂章我们将介绍关于⽅法调⽤的五个指令：
 
 - invokestatic：⽤于调⽤静态⽅法
 -  invokespecial：⽤于调⽤私有实例⽅法、构造器，以及使⽤ super 关键字调⽤⽗类的实例⽅法或构造器，和所实现接口的默认⽅法 
 - invokevirtual：⽤于调⽤⾮私有实例⽅法
--  invokeinterface：⽤于调⽤接⼜⽅法
+-  invokeinterface：⽤于调⽤接口⽅法
 - invokedynamic：⽤于调⽤动态⽅法
 
 ## 0x01 ⽅法的静态绑定与动态绑定
@@ -1090,7 +1094,7 @@ invokestatic ⽤来调⽤静态⽅法，即使⽤ static 关键字修饰的⽅�
 ## 0x03 invokevirtual vs invokespecial 既⽣瑜何⽣亮
 
 - invokevirtual：⽤来调⽤ public、protected、package 访问级别的⽅法 
-- invokespecial：顾名思义，它是「特殊」的⽅法，包括实例构造⽅法、私有⽅法（private 修饰的⽅法）和⽗类⽅法（即 super 关键字调⽤的⽅法）。很明显，这些「特殊」的⽅法可以直接确定实际 执⾏的⽅法的实现，与 invokestatic ⼀样，也属于静态绑定 
+- invokespecial：顾名思义，它是「特殊」的⽅法，包括实例构造⽅法、私有⽅法（private 修饰的⽅法）和⽗类⽅法（即 super 关键字调⽤的⽅法）。很明显，这些「特殊」的⽅法可以直接确定实际执⾏的⽅法的实现，与 invokestatic ⼀样，也属于静态绑定 
 
 在 JDK 1.0.2 之前，invokespecial 指令曾被命名为 invokenonvirtual，以区别于 invokevirtual 
 
@@ -1155,11 +1159,11 @@ Color name is Red
 
 ## 0x04 invokeinterface vs invokevirtual 孪⽣兄弟⼤不同
 
-invokeinterface ⽤于调⽤接⼜⽅法，在运⾏时再确定⼀个实现此接⼜的对象。 那它跟 invokevirtual 有什么区别呢？为什么不⽤ invokevirtual 来实现接⼜⽅法的调⽤？其实也不是不可以，只是为了效率上的 考量。
+invokeinterface ⽤于调⽤接口⽅法，在运⾏时再确定⼀个实现此接口的对象。 那它跟 invokevirtual 有什么区别呢？为什么不⽤ invokevirtual 来实现接口⽅法的调⽤？其实也不是不可以，只是为了效率上的 考量。
 
-invokestatic 指令需要调⽤的⽅法只属于某个特定的类，在编译期唯⼀确定，不会运⾏时动态变化，是最快的 invokespecial 指令可能调⽤的⽅法也在编译期确定，且只有少数⼏个需要处理的⽅法，查找也 ⾮常快 
+invokestatic 指令需要调⽤的⽅法只属于某个特定的类，在编译期唯⼀确定，不会运⾏时动态变化，是最快的 invokespecial 指令可能调⽤的⽅法也在编译期确定，且只有少数⼏个需要处理的⽅法，查找也⾮常快 
 
-invokevirtual 和 invokeinterface 的关系就⽐较微妙了，区别没有那么明显，我们⽤⼀个实际的例⼦来说明，可以这么认为，每个类⽂件都关联着⼀个「虚⽅法表」（virtual method table），这个表中包含了 ⽗类的⽅法和⾃⼰扩展的⽅法。⽐如
+invokevirtual 和 invokeinterface 的关系就⽐较微妙了，区别没有那么明显，我们⽤⼀个实际的例⼦来说明，可以这么认为，每个类⽂件都关联着⼀个「虚⽅法表」（virtual method table），这个表中包含了⽗类的⽅法和⾃⼰扩展的⽅法。⽐如
 
 ```java
 class A { 
@@ -1180,7 +1184,7 @@ class B extends A {
 
 现在 B 类的虚⽅法表保留了⽗类 A 中⽅法的顺序，只是覆盖了 method2() 指向的函数链接和新增了method4()。 假设这时需要调⽤ method2 ⽅法，invokevirtual 只需要直接去找虚⽅法表位置为 2 的地⽅的 函数引⽤就可以了
 
-如果是⽤ invokeinterface，这样的优化是没法起作⽤的，⽐如，我们改⼀下让 B 实现 X 接⼜
+如果是⽤ invokeinterface，这样的优化是没法起作⽤的，⽐如，我们改⼀下让 B 实现 X 接口
 
 ```java
 interface X { 
@@ -1332,7 +1336,7 @@ vtable 是 Java 实现多态的基⽯，如果⼀个⽅法被继承和重写，�
 
 
 
-下⾯我们在做⼀些实验，让 B 实现接⼜ MyInterface，同时在 B 中新增了⼀个 static ⽅法和⼀个 final ⽅法。
+下⾯我们在做⼀些实验，让 B 实现接口 MyInterface，同时在 B 中新增了⼀个 static ⽅法和⼀个 final ⽅法。
 
 ```java
 public interface MyInterface { 
@@ -1742,7 +1746,7 @@ public static CallSite metafactory(
 
 - caller：JVM 提供的查找上下⽂
 -  invokedName：表⽰调⽤函数名，在本例中 invokedName 为 "run" 
-- samMethodType：函数式接⼜定义的⽅法签名（参数类型和返回值类型），本例中为 run ⽅法的签名 "()void" 
+- samMethodType：函数式接口定义的⽅法签名（参数类型和返回值类型），本例中为 run ⽅法的签名 "()void" 
 - implMethod：编译时⽣成的 lambda 表达式对应的静态⽅法invokestatic Test.lambda$main$0 
 - instantiatedMethodType：⼀般和 samMethodType 是⼀样或是它的⼀个特例，在本例中是 "()void"
 
@@ -1786,7 +1790,7 @@ static {
 
 使⽤java -Djdk.internal.lambda.dumpProxyClasses=. Test运⾏ Test 类会发现在运⾏期间⽣成了⼀个新的内部类： Test$$Lambda$1.class。这个类正是由InnerClassLambdaMetafactory 使⽤ ASM 字节码 技术动态⽣成的，只是默认情况看不到⽽已。
 
-这个类实现了 Runnable 接⼜，并在 run ⽅法⾥调⽤了 Test 类的静态⽅法lambda$main$0()。
+这个类实现了 Runnable 接口，并在 run ⽅法⾥调⽤了 Test 类的静态⽅法lambda$main$0()。
 
 把这个类的字节码⼈⾁翻译过来是下⾯这样
 
@@ -1803,7 +1807,7 @@ final class Test$$Lambda$1 implements Runnable {
 
 - lambda 表达式声明的地⽅会⽣成⼀个 invokedynamic 指令，同时编译器⽣成⼀个对应的引导⽅法（Bootstrap Method） 
 - 第⼀次执⾏ invokedynamic 指令时，会调⽤对应的引导⽅法（Bootstrap Method），该引导⽅法会调⽤ LambdaMetafactory.metafactory ⽅法动态⽣成内部类 
-- 引导⽅法会返回⼀个动态调⽤ CallSite 对象，这个 CallSite 会链接最终调⽤的实现了 Runnable 接⼜的内部类 lambda 表达式中的内容会被编译成静态⽅法，前⾯动态⽣成的内部类会直接调⽤该静态⽅法 
+- 引导⽅法会返回⼀个动态调⽤ CallSite 对象，这个 CallSite 会链接最终调⽤的实现了 Runnable 接口的内部类 lambda 表达式中的内容会被编译成静态⽅法，前⾯动态⽣成的内部类会直接调⽤该静态⽅法 
 - 真正执⾏ lambda 调⽤的还是⽤ invokeinterface 指令
 
 ## 0x03 为什么 Java 8 的 Lambda 表达式要基于 invokedynamic
@@ -1861,6 +1865,8 @@ r2.run();
 
 
 # 9. i++ vs ++i
+
+<img src="pic/JVM字节码从入门到精通/image-20211116120710218.png" alt="image-20211116120710218" style="zoom:50%;" />
 
 ## 0x01 看⼀道笔试题
 
@@ -2242,13 +2248,367 @@ public int testSameHash_translate(String name) {
 
 # 11. try-catch-finally 
 
+<img src="pic/JVM字节码从入门到精通/image-20211116120633601.png" alt="image-20211116120633601" style="zoom:50%;" />
 
+Java笔试中，经常会考 try catch finally 执⾏顺序和返回值的问题，⼤部分都只在书⾥⾯看过，说 finally ⼀定会执⾏。其背后的原因值得深究，看看try catch finally 这个语法糖背后的实现原理
 
-# try-with-resource
+## 0x01 try catch 字节码分析
 
+```java
+public class TryCatchFinallyDemo { 
+  public void foo() { 
+    try { 
+      tryItOut1(); 
+    } catch (MyException1 e) { 
+      handleException(e); 
+    } 
+  } 
+}
+```
 
+<img src="pic/JVM字节码从入门到精通/image-20211116080742735.png" alt="image-20211116080742735" style="zoom:50%;" />
 
-# Kotlin
+在编译后字节码中，每个⽅法都附带⼀个异常表（Exception table），异常表⾥的每⼀⾏表⽰⼀个异常处理器，由 from 指针、to 指针、target 指针、所捕获的异常类型 type 组成。这些指针的值是字节码索 引，⽤于定位字节码 其含义是在[from, to)字节码范围内，抛出了异常类型为type的异常，就会跳转到target表⽰的字节码处。 ⽐如，上⾯的例⼦异常表表⽰：在0到4中间（不包含 4）如果抛出 了MyException1 的异常，就跳转到7执⾏。
+
+当有多个的catch的情况下，又会是怎样？
+
+```java
+public void foo() { 
+  try { 
+    tryItOut2(); 
+  } catch (MyException1 e) { 
+    handleException1(e); 
+  } catch (MyException2 e) { 
+    handleException2(e); 
+  } 
+}
+```
+
+对应字节码如下：
+
+<img src="pic/JVM字节码从入门到精通/image-20211116103453320.png" alt="image-20211116103453320" style="zoom:50%;" />
+
+可以看到多⼀个异常，会在异常表（Exception table ⾥⾯多⼀条记录）。
+
+当程序出现异常时，Java 虚拟机会从上⾄下遍历异常表中所有的条⽬。当触发异常的字节码索引值在某个异常条⽬的[from, to)范围内，则会判断抛出的异常与该条⽬想捕获的异常是否匹配。
+
+- 如果匹配，Java 虚拟机会将控制流跳转到 target 指向的字节码；如果不匹配则继续遍历异常表 
+- 如果遍历完所有的异常表，还未匹配到异常处理器，那么该异常将蔓延到调⽤⽅（caller）中重复上述的操作。最坏的情况下虚拟机需要遍历该线程 Java 栈上所有⽅法的异常表
+
+## 0x02 finally 字节码分析
+
+finally 的字节码分析最为有意思，之前我⼀直以为 finally 的实现是⽤简单的跳转来实现的，实际上并⾮如此。⽐如下⾯的代码
+
+```java
+public void foo() { 
+  try { 
+    tryItOut1(); 
+  } catch (MyException1 e) { 
+    handleException(e); 
+  } finally { 
+    handleFinally(); 
+  } 
+}
+```
+
+对应的字节码如下：
+
+<img src="pic/JVM字节码从入门到精通/image-20211116103646818.png" alt="image-20211116103646818" style="zoom:50%;" />
+
+可以看到，字节码中包含了三份 finally 语句块，都在程序正常 return 和异常 throw 之前。其中两处在 try 和 catch 调⽤ return 之前，⼀处是在异常 throw 之前。 Java 采⽤⽅式是复制 finally 代码块的内容，分别放在 try catch 代码块所有正常 return 和 异常 throw 之前。 相当于如下的代码：
+
+```java
+public void foo() {
+	try { 
+    tryItOut1(); 
+    handleFinally(); 
+  } catch (MyException1 e) { 
+    handleException(e); 
+    handleFinally(); 
+  } catch (Throwable e) { 
+    handleFinally(); 
+    throw e; 
+  }
+}
+```
+
+整个过程如下图所⽰
+
+<img src="pic/JVM字节码从入门到精通/image-20211116103835411.png" alt="image-20211116103835411" style="zoom:50%;" />
+
+这样就解释了我们⼀直以来被灌输的观点，finally语句⼀定会执⾏
+
+## 0x03 ⾯试题解析
+
+这⾥有⼀个笔试中特别喜欢考，但是实际⽤处不⼤的场景：在 finally 中有 return 的情况 。
+
+有了上述分析，就⽐较简单了，如果 finally 中有 return，因为它先于其它的执⾏，会覆盖其它的返回（包括异 常）
+
+题⽬1： 
+
+```java
+public static int func() { 
+  try { 
+    return 0; 
+  } catch (Exception e){ 
+    return 1; 
+  } finally { 
+    return 2; 
+  } 
+} 
+// 返回 2
+```
+
+题⽬2： 
+
+```java
+public static int func() { 
+  try { 
+    int a = 1 / 0; 
+    return 0; 
+  } catch (Exception e) { 
+    return 1; 
+  } finally { 
+    return 2; 
+  } 
+} 
+// 返回 2
+```
+
+题⽬3： 
+
+```java
+public static int func() { 
+  try { 
+    int a = 1 / 0; 
+    return 0; 
+  } catch (Exception e) { 
+    int b = 1 / 0; 
+  } finally { 
+    return 2; 
+  } 
+} 
+// 返回 2
+```
+
+ 问题4:
+
+<img src="pic/JVM字节码从入门到精通/image-20211116111343125.png" alt="image-20211116111343125" style="zoom:50%;" />
+
+问题是：字节码中的第 10 ⾏ astore 4 是什么意思，栈上不都是空的吗？还有为什么显⽰局部变量 locals 个数等于 5，不是只有 this、s1、s2 这 3 个吗？
+
+先来看astore_3这个字节码，其实是把 s1 的引⽤存储到局部变量表 slot 为 3 的位置上。第 10 ⾏的astore 4 是什么呢？从异常表（Exception table）可以看到第 10 ⾏开始是异常处理的逻辑，这个时候栈顶 并⾮是空的，栈顶元素就是抛出的异常，astore 4 将这个异常放到局部变量表中 slot 为 4 的位置。因此最后⼀个局部变量也清楚了。局部变量表列表如下：
+
+```shell
+0：this 
+1：s1 
+2：s2 
+3：tmp_s1 
+4：exception
+```
+
+如果上⾯的例⼦还不够清楚直接，可以再来⼀段代码
+
+<img src="pic/JVM字节码从入门到精通/image-20211116115420316.png" alt="image-20211116115420316" style="zoom:50%;" />
+
+字节码中 12 ⾏开始是异常处理的逻辑，字节码16: aload_2 17: athrow ，通过 athrow 可以知道局部变量表中位置为 2 的变量是⼀个异常。与上⾯的例⼦是⼀样的。
+
+## 0x05 ⼩结
+
+这篇⽂章我们讲了 try-catch-finally 语句块的底层字节码实现，⼀起来回顾⼀下要点：
+
+- 第⼀，JVM 采⽤异常表的⽅式来处理 try-catch 的跳转逻辑；
+- 第⼆，finally 的实现采⽤拷贝 finally 语句块的⽅式来实现 finally ⼀定会执⾏的语义逻辑； 
+- 第三，讲解了⾯试喜欢考的在 finally 中有 return 语句或者 抛异常的情况。
+
+## 0x06 作业题
+
+最后，给你留两道作业题。 1、下⾯代码输出什么，原因是什么
+
+```java
+public static int foo() { 
+  int x = 0; 
+  try { 
+    return x; 
+  } finally { 
+    ++x; 
+  } 
+}
+
+public static void main(String[] args) { 
+  int res = foo(); 
+  System.out.println(res); 
+}
+// 输出 0
+```
+
+2、低版本的 JDK 采⽤ jsr/ret 来实现 finally 语句块，你可以去了解⼀下这两个指令的作⽤，实现⼀下 finally 语义吗？
+
+# 12. try-with-resource
+
+<img src="pic/JVM字节码从入门到精通/image-20211116120554956.png" alt="image-20211116120554956" style="zoom:50%;" />
+
+Java 7中的 try-with-resource，在没有这个语法糖的情况下的等价实现是什么？ 以下⾯的 demo 为例，这个问题⽬测 99%的⼈都写不完全正确，不信来战。
+
+## 0x01 初试⽜⼑
+
+```java
+public static void foo() throws Exception { 
+  try (AutoCloseable c = dummy()) { 
+    bar(); 
+  } 
+}
+
+public static void bar() { 
+  // may throw exception 
+}
+```
+
+我们凭第⼀感觉来写⼀下：
+
+```java
+public static void foo() throws Exception {
+	AutoCloseable c = null; 
+  try { 
+    c = dummy(); 
+    bar(); 
+  } finally { 
+    if (c != null) { 
+      c.close(); 
+    } 
+  }
+}
+```
+
+看起来没什么问题，但是仔细想⼀下，如果bar()抛出了异常e1，c.close()也抛出了异常e2，调⽤者会收到哪个呢？ 我们来回顾⼀下Java基础，try catch finally 部分
+
+```java
+public static void foo() { 
+  try { 
+    throw new RuntimeException("in try"); 
+  } finally { 
+    throw new RuntimeException("in finally" ); 
+  } 
+}
+```
+
+调⽤foo()函数最终会抛出什么异常呢？ 运⾏⼀下： Exception in thread "main" java.lang.RuntimeException: in finally
+
+try中抛出的异常，就被finally 中抛出的异常淹没掉了。
+
+## 0x02 suppressed 异常是什么
+
+回到刚刚的问题，如果 bar() 和 c.close()同时抛了异常，那么调⽤端应该会收到c.close()抛出的异常e2, 往往这并不是我们想要的。那么怎么样抛出 try 中的异常，同时又不丢掉 finally 中的异常呢？ 
+
+> Java 7 中 为 Throwable 类 增 加 的 addSuppressed ⽅ 法。当 ⼀ 个异 常 被 抛 出 的 时 候 , 可 能 有 其 他 异 常 因 为 该 异 常 ⽽ 被 抑 制 住 , 从 ⽽ ⽆ 法 正 常 抛 出 。 这时 可 以 通过addSuppressed ⽅ 法 把 这 些 被 抑 制 的 ⽅ 法 记 录 下 来 。 被 抑 制 的 异 常 会 出 现在 抛 出 的 异 常 的 堆 栈 信 息 中 , 也 可 以 通 过 getSuppressed ⽅ 法 来 获 取 这 些 异 常 。 这 样做 的好处是不会丢失任何异常,⽅便开发⼈员进⾏调试。
+
+ 有了上述概念，我们进⾏改写
+
+```java
+public static void foo() throws Exception {
+	AutoCloseable c = null; 
+  Exception tmpException = null; 
+  try {
+		c = dummy();
+		bar(); 
+  } catch (Exception e) {
+		tmpException = e;
+		throw e; 
+  } finally {
+		if (c != null) {
+			if (tmpException != null) { 
+        try { 
+          c.close(); 
+        } catch (Exception e) { 
+          tmpException.addSuppressed(e); 
+        }
+			} else { 
+        c.close();
+			}
+		}
+	}
+}
+```
+
+验证我们的想法 javap -c 查看字节码：
+
+```shell
+public static void foo() throws java.lang.Exception;
+	Code:
+		0: invokestatic 		#2	  // Method dummy:()Ljava/lang/AutoCloseable; 
+		3: astore_0 
+		4: aconst_null 
+		5: astore_1
+
+		6: invokestatic			#3		// Method bar:()V
+
+		9: aload_0 
+	 10: ifnull 					86
+	 13: aload_1 
+	 14: ifnull						35
+
+	 17: aload_0 
+	 18: invokeinterface 	#4, 1	// InterfaceMethod java/lang/AutoCloseable.close:()V
+	 23: goto 						86
+
+	 26: astore_2 
+	 27: aload_1 
+	 28: aload_2 
+	 29: invokevirtual 		#6 		// Method java/lang/Throwable.addSuppressed:(Ljava/lang/Throwable;)V
+	 32: goto 						86 
+	 35: aload_0 
+	 36: invokeinterface 	#4, 1  // InterfaceMethod java/lang/AutoCloseable.close:()V
+	 41: goto 						86
+
+	 44: astore_2 
+	 45: aload_2 
+	 46: astore_1 
+	 47: aload_2 
+	 48: athrow
+
+   49: astore_3 
+   50: aload_0 
+   51: ifnull 					84
+   54: aload_1 
+   55: ifnull						78
+
+	 58: aload_0 
+	 59: invokeinterface 	#4, 1  // InterfaceMethod java/lang/AutoCloseable.close:()V
+	 64: goto 						84
+
+	 67: astore						4
+	 69: aload_1 
+	 70: aload 						4 
+	 72: invokevirtual 		#6 		 // Method java/lang/Throwable.addSuppressed:(Ljava/lang/Throwable;)V
+	 75: goto 						84 
+	 78: aload_0 
+	 79: invokeinterface 	#4, 1  // InterfaceMethod java/lang/AutoCloseable.close:()V
+	 84: aload_3 
+	 85: athrow 
+	 86: return 
+Exception table:
+	from to target type 
+	17 23 26 Class java/lang/Throwable 
+	 6  9 44 Class java/lang/Throwable 
+	 6  9 49 any 
+	58 64 67 Class java/lang/Throwable 
+	44 50 49 any
+```
+
+从字节码的细节可以看到基本跟我们最后的逻辑⼀致。
+
+## 0x03 ⼩结
+
+这篇⽂章我们讲了 try with resource 语句块的底层字节码实现，⼀起来回顾⼀下要点：
+
+- 第⼀，try-with-resource 语法并不是简单的在 finally ⾥中加⼊了closable.close()⽅法，因为 finally 中的 close ⽅法如果抛出了异常会淹没真正的异常； 
+- 第⼆，引⼊了 suppressed 异常的概念，能抛出真正的异常，且会调⽤ addSuppressed 附带上 suppressed 的异常。
+
+## 0x04 思考
+
+留⼀个作业：我们没有逐⾏解析 0x02 中的字节码，你能逐⾏分析⼀下每条字节码的含义吗？
+
+# 13. Kotlin
 
 
 
