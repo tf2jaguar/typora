@@ -2612,17 +2612,366 @@ Exception table:
 
 
 
-# synchronized
+# 14. synchronized
+
+<img src="pic/JVM字节码从入门到精通/image-20211116151950900.png" alt="image-20211116151950900" style="zoom:50%;" />
+
+这篇⽂章我们将深⼊的分析 synchronized 关键字在字节码层⾯是如何实现的
+
+## 0x01 代码块级别的 synchronized
+
+```java
+private Object lock = new Object(); 
+public void foo() {
+	synchronized (lock) {
+		bar();
+	} 
+}
+public void bar() { }
+```
+
+编译成字节码如下
+
+```shell
+public void foo(); 
+	Code: 
+		0: aload_0 
+		1: getfield 			#3		// Field lock:Ljava/lang/Object;
+		4: dup 
+		5: astore_1
+
+		6: monitorenter
+		
+		7: aload_0 
+		8: invokevirtual 	#4		// Method bar:()V
+
+	 11: aload_1 
+	 12: monitorexit 
+	 13: goto						21
+
+	 16: astore_2 
+	 17: aload_1 
+	 18: monitorexit 
+	 19: aload_2 
+	 20: athrow 
+	 21: return 
+Exception table:
+	from to target type 
+		 7 13 	16  	any 
+		16 19 	16	  any
+```
+
+Java 虚拟机中代码块的同步是通过 monitorenter 和 monitorexit 两个⽀持 synchronized 关键字语意的。⽐如上⾯的字节码
+
+- 0 ~ 5：将 lock 对象⼊栈，使⽤ dup 指令复制栈顶元素，并将它存⼊局部变量表位置 1 的地⽅，现在栈上还剩下⼀个 lock 对象 
+- 6：以栈顶元素 lock 做为锁，使⽤ monitorenter 开始同步 
+- 7 ~ 8：调⽤ bar() ⽅法
+- 11 ~ 12：将 lock 对象⼊栈，调⽤ monitorexit 释放锁
+
+monitorenter 对操作数栈的影响如下
+
+<img src="pic/JVM字节码从入门到精通/image-20211116152627713.png" alt="image-20211116152627713" style="zoom:50%;" />
+
+- 16 ~ 20：执⾏异常处理，我们代码中本来没有 try-catch 的代码，为什么字节码会帮忙加上这段逻辑呢？
+
+因为编译器必须保证，⽆论同步代码块中的代码以何种⽅式结束（正常 return 或者异常退出），代码中每次调⽤ monitorenter 必须执⾏对应的 monitorexit 指令。为了保证这⼀点，编译器会⾃动⽣成⼀个 异常处理器，这个异常处理器的⽬的就是为了同步代码块抛出异常时能执⾏ monitorexit。这也是字节码中，只有⼀个 monitorenter 却有两个 monitorexit 的原因 
+
+可理解为这样的⼀段 Java 代码
+
+```java
+public void _foo() throws Throwable { 
+  monitorenter(lock); 
+  try { 
+    bar(); 
+  } finally { 
+    monitorexit(lock); 
+  } 
+}
+```
+
+根据我们之前介绍的 try-catch-finally 的字节码实现原理，复制 finally 语句块到所有可能函数退出的地⽅，上⾯的代码等价于
+
+```java
+public void _foo() throws Throwable { 
+  monitorenter(lock); 
+  try { 
+    bar(); 
+    monitorexit(lock); 
+  } catch (Throwable e) { 
+    monitorexit(lock); 
+    throw e; 
+  } 
+}
+```
+
+## 0x02 ⽅法级的 synchronized
+
+⽅法级的同步与上述有所不同，它是由常量池中⽅法的 ACC_SYNCHRONIZED 标志来隐式实现的。
+
+```java
+synchronized public void testMe() { }
+```
+
+对应字节码
+
+```shell
+public synchronized void testMe(); 
+descriptor: ()V 
+flags: ACC_PUBLIC, ACC_SYNCHRONIZED
+```
+
+JVM 不会使⽤特殊的字节码来调⽤同步⽅法，当 JVM 解析⽅法的符号引⽤时，它会判断⽅法是不是同步的（检查⽅法 ACC_SYNCHRONIZED 是否被设置）。
+
+如果是，执⾏线程会先尝试获取锁。如果是 实例⽅法，JVM 会尝试获取实例对象的锁，如果是类⽅法，JVM 会尝试获取类锁。在同步⽅法完成以后，不管是正常返回还是异常返回，都会释放锁
+
+## 0x03 ⼩结
+
+这篇⽂章我们讲了 synchronized 关键字在字节码层⾯的实现细节，⼀起来回顾⼀下要点：
+
+- 第⼀，代码块级别的 synchronized 是使⽤ monitorenter、monitorexit 指令来实现的，monitorexit 会在所有可能退出 的地⽅调⽤（正常退出、异常退出），以实现 monitorexit ⼀定会调⽤的语义。
+- 第⼆，⽅法级的 synchronized 是 JVM 隐式实现的，没有成对的 monitorenter-monitorexit 语句块。
+
+## 0x04 思考
+
+留⼀道作业题：monitorenter 和 monitorexit 底层做了什么？跟 Java 的对象头有什么关系？
+
+欢迎你在留⾔区留⾔，和我⼀起讨论。
+
+# 15. java泛型
+
+<img src="pic/JVM字节码从入门到精通/image-20211116153403987.png" alt="image-20211116153403987" style="zoom:50%;" />
+
+Java 泛型是 JDK5 引进的新特性，对于泛型的引⼊，社区褒贬不⼀，好的地⽅是泛型可以在编译期帮我们发现⼀些明显的问题，不好的地⽅是泛型在设计上因为考虑兼容性等原因，留下了⽐较⼤的坑。 ⽹上有很多喷 Java 的泛型设计，甚⾄《Thinking in Java》的作者都发表了⼀篇⽂章来批评 JDK5 中的泛型实现，知乎也有很多类似的帖⼦。 Java 泛型更像是⼀个 Java 语⾔的语法糖，我们将从字节码的⾓度分析⼀下泛型。
+
+## 0x01 当泛型遇到重载
+
+```java
+public void print(List<String> list) { } 
+public void print(List<Integer> list) { }
+```
+
+上⾯的代码编译的时候会报错，提⽰name clash: print(List<Integer>) and print(List<String>) have the same erasure 这两个函数对应的字节码都是
+
+```shell
+descriptor: (Ljava/util/List;)V 
+Code:
+	stack=0, locals=2, args_size=2 
+		0: return 
+	LocalVariableTable:
+		Start Length Slot Name Signature 
+			0 		1 		0 	this LMyClass;
+			0 		1 		1 	list Ljava/util/List;
+```
+
+为了弄懂这个问题，需要先了解泛型的类型擦除
+
+## 0x02 泛型的核⼼概念：类型擦除（type erasure）
+
+理解泛型概念的最重要的是理解类型擦除。Java 的泛型是在 javac 编译期这个级别实现的。在⽣成的字节码中，已经不包含类型信息了。这种在泛型使⽤时加上类型参数，在编译时被抹掉的过程被称为泛 型擦除。 
+
+⽐如在代码中定义：List<String> 与 List<Integer> 在编译以后都变成了 List。JVM 看到的只是 List，⽽ JVM 不允许相同签名的函数在⼀个类中同时存在，所以上⾯代码中编译⽆法通过。 
+
+由泛型附加的类型信息对 JVM 来说是不可见的。Java 编译器会在编译时尽可能的发现可能出错的地⽅，但是也不是万能的。 很多泛型的奇怪语法规定都与类型擦除的存在有关
+
+- 泛型类并没有⾃⼰独有的 Class 类对象，⽐如并不存在 List<String>.class 或是 List<Integer>.class，⽽只有 List.class。 
+- 泛型的类型参数不能⽤在 Java 异常处理的 catch 语句中。因为异常处理是由 JVM 在运⾏时刻来进⾏的。由于类型信息被擦除，JVM 是⽆法区分两个异常类型 和 MyException<Integer>的。对于 JVM 来说，它们都是 MyException 类型的 MyException<String>
+
+## 0x03 泛型真的被完全擦除了吗
+
+学习泛型的时候，我们被⼤量的⽂章警⽰「泛型信息在编译之后是拿不到的，因为已经被擦除掉」，真的是这样吗？ 我们在 javac 编译的时候加上 -g 参数⽣成更多的调试信息，使⽤ javap -c -v -l 来查看字节码时可以看到更多有⽤的信息
+
+```shell
+public void print(java.util.List<java.lang.String>);
+	descriptor: (Ljava/util/List;)V 
+		stack=0, locals=2, args_size=2 
+			0: return 
+		LocalVariableTypeTable:
+			Start Length Slot Name Signature 
+					0 		1 		1 list Ljava/util/List<Ljava/lang/String;>; 
+			Signature: #18 					// (Ljava/util/List<Ljava/lang/String;>;)V
+```
+
+LocalVariableTypeTable 和 Signature 是针对泛型引⼊的新的属性，⽤来解决泛型的参数类型识别问题，Signature 最为重要，它的作⽤是存储⼀个⽅法在字节码层⾯的特征签名，这个属性保存的不是原⽣ 类型，⽽是包括了参数化类型的信息。我们依然可以通过反射的⽅式拿到参数的类型。所谓的擦除，只是把⽅法 code 属性的字节码进⾏擦除。 
+
+## 0x04 ⼩结
+
+这篇⽂章我们讲解了字节码在 Java 泛型上的应⽤，⼀起来回顾⼀下要点：第⼀，由于类型擦除的存在，List<String>.class、List<Integer>.class在 JVM 层⾯只有 List.class，因此泛型在重载上有⼀些 问题。第⼆，通过 javap 可以看到泛型的类型擦除并不是完全擦除了，字节码中 Signature 域存储了⽅法带有泛型的签名。
+
+## 0x05 思考
+
+留⼀道作业题：下⾯的代码，你可以看出为什么 Java 编译器会提⽰编译错误吗？
+
+```java
+public void inspect(List<Object> list) { } 
+public void test() {
+	List<String> strs = new ArrayList<String>();
+	inspect(strs); // 编译错误 
+}
+```
 
 
 
-# java泛型
+---
+
+
+
+# 16. 反射背后的原理
+
+在 Java 中反射随处可见，它底层的原也⽐较有意思，这篇⽂章来详细介绍反射背后的原理。
+
+## 0x01 一个例子
+
+先来看下⾯这个例⼦：
+
+```java
+public class ReflectionTest {
+	private static int count = 0; 
+  public static void foo() { 
+    new Exception("test#" + (count++)).printStackTrace(); 
+  }
+
+	public static void main(String[] args) throws Exception { 
+    Class<?> clz = Class.forName("ReflectionTest"); 
+    Method method = clz.getMethod("foo"); 
+    for (int i = 0; i < 20; i++) { 
+      method.invoke(null);
+    } 
+  }
+}
+```
+
+运⾏结果如下
+
+<img src="pic/JVM字节码从入门到精通/image-20211116153956131.png" alt="image-20211116153956131" style="zoom:50%;" />
+
+可以看到同⼀段代码，运⾏的堆栈结果与执⾏次数有关系，在 0 ~ 15 次调⽤⽅式为sun.reflect.NativeMethodAccessorImpl.invoke0，从第 16 次开始调⽤⽅式变为 了sun.reflect.GeneratedMethodAccessor1.invoke。原因是什么呢？继续往下看。
+
+## 0x02 反射⽅法源码分析
+
+Method.invoke 源码如下：
+
+<img src="pic/JVM字节码从入门到精通/image-20211116154152989.png" alt="image-20211116154152989" style="zoom:50%;" />
+
+可以最终调⽤了MethodAccessor.invoke⽅法，MethodAccessor 是⼀个接⼜
+
+```java
+public interface MethodAccessor { 
+  public Object invoke(Object obj, Object[] args) throws IllegalArgumentException, InvocationTargetException; 
+}
+```
+
+从输出的堆栈可以看到 MethodAccessor 的实现类是委托类DelegatingMethodAccessorImpl，它的 invoke 函数⾮常简单，就是把调⽤委托给了真正的实现类。
+
+```java
+class DelegatingMethodAccessorImpl extends MethodAccessorImpl {
+	private MethodAccessorImpl delegate; 
+  public Object invoke(Object obj, Object[] args) throws IllegalArgumentException, InvocationTargetException {
+	return delegate.invoke(obj, args); 
+  }
+```
+
+通过堆栈可以看到在第 0 ~ 15 次调⽤中，实现类是 NativeMethodAccessorImpl，从第 16 次调⽤开始实现类是 GeneratedMethodAccessor1，为什么是这样呢？⽞机就在 NativeMethodAccessorImpl 的 invoke ⽅法中
+
+<img src="pic/JVM字节码从入门到精通/image-20211116154308809.png" alt="image-20211116154308809" style="zoom:50%;" />
+
+前 0 ~ 15 次都会调⽤到invoke0 ，这是⼀个 native 的函数。
+
+```java
+private static native Object invoke0(Method m, Object obj, Object[] args);
+```
+
+有兴趣的同学可以去看⼀下 Hotspot 的源码，依次跟踪下⾯的代码和函数：
+
+> ./jdk/src/share/native/sun/reflect/NativeAccessors.c
+>
+> JNIEXPORT jobject JNICALL Java_sun_reflect_NativeMethodAccessorImpl_invoke0 (JNIEnv *env, jclass unused, jobject m, jobject obj, jobjectArray args)
+>
+> ./hotspot/src/share/vm/prims/jvm.cpp JVM_ENTRY(jobject, JVM_InvokeMethod(JNIEnv *env, jobject method, jobject obj, jobjectArray args0))
+>
+> ./hotspot/src/share/vm/runtime/reflection.cpp oop Reflection::invoke_method(oop method_mirror, Handle receiver, objArrayHandle args, TRAPS)
+>
+
+这⾥不详细展开 native 实现的细节。
+
+
+
+15 次以后会⾛新的逻辑，使⽤ GeneratedMethodAccessor1 来调⽤反射的⽅法。MethodAccessorGenerator 的作⽤是通过 ASM ⽣成新的类 sun.reflect.GeneratedMethodAccessor1。为了查看整个类的内容， 可以使⽤阿⾥的 [arthas](https://arthas.aliyun.com/doc/) ⼯具。修改上⾯的代码，在 main 函数的最后加上System.in.read(); 让 JVM 进程不要退出。 执⾏ arthas ⼯具中的./as.sh ，会要求输⼊ JVM 进程
+
+<img src="pic/JVM字节码从入门到精通/image-20211116154543506.png" alt="image-20211116154543506" style="zoom:50%;" />
+
+选择在运⾏的 ReflectionTest 进程号 7 就进⼊到了 arthas 交互性界⾯。执⾏ dump sun.reflect.GeneratedMethodAccessor1⽂件就保存到了本地。
+
+<img src="pic/JVM字节码从入门到精通/image-20211116154609980.png" alt="image-20211116154609980" style="zoom:50%;" />
+
+来看下这个类的字节码
+
+<img src="pic/JVM字节码从入门到精通/image-20211116154628679.png" alt="image-20211116154628679" style="zoom:50%;" />
+
+⼈⾁翻译⼀下这个字节码，忽略掉异常处理以后的代码如下
+
+```java
+public class GeneratedMethodAccessor1 extends MethodAccessorImpl { 
+  @Override 
+  public Object invoke(Object obj, Object[] args) throws IllegalArgumentException, InvocationTargetException { 
+    ReflectionTest.foo(); 
+    return null; 
+  } 
+}
+```
+
+那为什么要采⽤ 0 ~ 15 次使⽤ native ⽅式来调⽤，15 次以后使⽤ ASM 新⽣成的类来处理反射的调⽤呢？
+
+⼀切都是基于性能的考虑。JNI native 调⽤的⽅式要⽐动态⽣成类调⽤的⽅式慢 20 倍，但是又由于第⼀次字节码⽣成的过程⽐较慢。如果反射仅调⽤⼀次的话，采⽤⽣成字节码的⽅式反⽽⽐ native 调⽤ 的⽅式慢 3 ~ 4 倍。
+
+## 0x03 inflation 机制
+
+因为很多情况下，反射只会调⽤⼀次，因此 JVM 想了⼀招，设置了 15 这个 sun.reflect.inflationThreshold 阈值，反射⽅法调⽤超过 15 次时（从 0 开始），采⽤ ASM ⽣成新的类，保证后⾯的调⽤⽐ native 要快。如果⼩于 15 次的情况下，还不如⽣成直接 native 来的简单直接，还不造成额外类的⽣成、校验、加载。这种⽅式被称为 「inflation 机制」。inflation 这个单词也⽐较有意思，它的字⾯意思是 「膨胀；通货膨胀」。
+
+JVM 与 inflation 相关的属性有两个，⼀个是刚提到的阈值 sun.reflect.inflationThreshold，还有⼀个是是否禁⽤ inflation的属性 sun.reflect.noInflation，默认值为 false。如果把这个值设置成true 的 话，从第 0 次开始就使⽤动态⽣成类的⽅式来调⽤反射⽅法了，不会使⽤ native 的⽅式。
+
+增加 noInflation 属性重新执⾏上述 Java 代码
+
+```shell
+java -cp . -Dsun.reflect.noInflation=true ReflectionTest
+```
+
+输出结果为
+
+```shell
+java.lang.Exception: test#0 
+		at ReflectionTest.foo(ReflectionTest.java:10) 
+		at sun.reflect.GeneratedMethodAccessor1.invoke(Unknown Source) 
+		at java.lang.reflect.Method.invoke(Method.java:497) 
+		at ReflectionTest.main(ReflectionTest.java:18) 
+java.lang.Exception: test#1 
+		at ReflectionTest.foo(ReflectionTest.java:10) 
+		at sun.reflect.GeneratedMethodAccessor1.invoke(Unknown Source) 
+		at java.lang.reflect.Method.invoke(Method.java:497) 
+		at ReflectionTest.main(ReflectionTest.java:18)
+```
+
+可以看到，从第 0 次开始就已经没有使⽤ native ⽅法来调⽤反射⽅法了。
+
+## 0x04 ⼩结 
+
+这篇⽂章主要介绍了 Java ⽅法反射调⽤底层的原理，主要有两种⽅式 
+
+- native ⽅法 
+- 动态⽣成类的⽅式 
+
+native 调⽤的⽅式⽐ Java 类直接调⽤的⽅式慢 20 倍，但是第⼀次⽣成动态类又⽐较耗时，因此 JVM 才有了⼀个优化策略，在某阈值之前使⽤ native 调⽤，在此阈值之后使⽤动态⽣成类的⽅式。这样既 可以保证在反射⽅法少数调⽤的情况下，不⽤⽣成新的类，又可以保证调⽤次数很多的情况下使⽤性能更优的动态类的⽅式。
+
+## 0x05 思考题
+
+现实中⼤量使⽤反射调⽤的项⽬，inflation 机制可能造成哪些隐患呢？
+
+
+
+---
 
 
 
 # javac 编译原理
-
-## javac 源码调试
 
 
 
