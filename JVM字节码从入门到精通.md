@@ -359,7 +359,7 @@ flags: ACC_PUBLIC
 Code:
 	stack=1, locals=1, args_size=1 
 	0: aload_0 
-	1: getfield #2 / Field name:Ljava/lang/String; 
+	1: getfield #2 		// Field name:Ljava/lang/String; 
 	4: areturn
 ```
 
@@ -682,7 +682,7 @@ long lookup_time_cost = nlabels;
 // opcode = 16 <= 18 ? tableswitch : lookupswich
 
 int opcode = nlabels > 0 &&
-table_space_cost + 3 * table_time_cost &lt;= lookup_space_cost + 3 * lookup_time_cost
+table_space_cost + 3 * table_time_cost <= lookup_space_cost + 3 * lookup_time_cost
 ? tableswitch : lookupswitch;
 ```
 
@@ -703,6 +703,8 @@ table_space_cost + 3 * table_time_cost &lt;= lookup_space_cost + 3 * lookup_time
 
 # 4. 对象相关字节码
 
+<img src="pic/JVM字节码从入门到精通/image-20211116120837729.png" alt="image-20211116120837729" style="zoom:50%;" />
+
 ## 0x01 new, \<init> & \<clinit>
 
 在 Java 中 new 是⼀个关键字，在字节码中也有⼀个指令 new。当我们创建⼀个对象时，背后发⽣了哪些事情呢？
@@ -714,9 +716,9 @@ ScoreCalculator calculator = new ScoreCalculator();
 对应的字节码如下：
 
 ```shell
-0: new #2 					// class ScoreCalculator
+0: new 						#2 			// class ScoreCalculator
 3: dup 
-4: invokespecial #3	// Method ScoreCalculator."<init>":()V
+4: invokespecial  #3			// Method ScoreCalculator."<init>":()V
 
 7: astore_1
 ```
@@ -740,7 +742,8 @@ public class Initializer {
   static int a; 
   static int b; 
   static {
-    a = 1; b = 2; 
+    a = 1; 
+    b = 2; 
   } 
 } 
 ```
@@ -789,10 +792,10 @@ public class B extends A {
 ```shell
 public B();
 	0: aload_0 	
-	1: invokespecial #1 		// Method A."<init>":()V
-	4: getstatic #2 				// Field java/lang/System.out:Ljava/io/PrintStream;
-	7: ldc #3 							// String B Instance
-	9: invokevirtual #4 		// Method java/io/PrintStream.println:(Ljava/lang/String;)V
+	1: invokespecial 		#1 		// Method A."<init>":()V
+	4: getstatic 				#2 		// Field java/lang/System.out:Ljava/io/PrintStream;
+	7: ldc 							#3 		// String B Instance
+	9: invokevirtual 		#4 		// Method java/io/PrintStream.println:(Ljava/lang/String;)V
  12: return
 ```
 
@@ -1060,12 +1063,14 @@ public class Son extends Father {
 
 # 5. invokeXXX 指令
 
+<img src="pic/JVM字节码从入门到精通/image-20211116120811235.png" alt="image-20211116120811235" style="zoom:50%;" />
+
 前⾯我们看到过⼏个关于⽅法调⽤的指令了。⽐如上篇⽂章有讲到的对象实例初始化<init>函数由 invokespecial 调⽤。这篇⽂章我们将介绍关于⽅法调⽤的五个指令：
 
 - invokestatic：⽤于调⽤静态⽅法
--  invokespecial：⽤于调⽤私有实例⽅法、构造器，以及使⽤ super 关键字调⽤⽗类的实例⽅法或构造器，和所实现接⼜的默认⽅法 
+-  invokespecial：⽤于调⽤私有实例⽅法、构造器，以及使⽤ super 关键字调⽤⽗类的实例⽅法或构造器，和所实现接口的默认⽅法 
 - invokevirtual：⽤于调⽤⾮私有实例⽅法
--  invokeinterface：⽤于调⽤接⼜⽅法
+-  invokeinterface：⽤于调⽤接口⽅法
 - invokedynamic：⽤于调⽤动态⽅法
 
 ## 0x01 ⽅法的静态绑定与动态绑定
@@ -1089,7 +1094,7 @@ invokestatic ⽤来调⽤静态⽅法，即使⽤ static 关键字修饰的⽅�
 ## 0x03 invokevirtual vs invokespecial 既⽣瑜何⽣亮
 
 - invokevirtual：⽤来调⽤ public、protected、package 访问级别的⽅法 
-- invokespecial：顾名思义，它是「特殊」的⽅法，包括实例构造⽅法、私有⽅法（private 修饰的⽅法）和⽗类⽅法（即 super 关键字调⽤的⽅法）。很明显，这些「特殊」的⽅法可以直接确定实际 执⾏的⽅法的实现，与 invokestatic ⼀样，也属于静态绑定 
+- invokespecial：顾名思义，它是「特殊」的⽅法，包括实例构造⽅法、私有⽅法（private 修饰的⽅法）和⽗类⽅法（即 super 关键字调⽤的⽅法）。很明显，这些「特殊」的⽅法可以直接确定实际执⾏的⽅法的实现，与 invokestatic ⼀样，也属于静态绑定 
 
 在 JDK 1.0.2 之前，invokespecial 指令曾被命名为 invokenonvirtual，以区别于 invokevirtual 
 
@@ -1154,11 +1159,11 @@ Color name is Red
 
 ## 0x04 invokeinterface vs invokevirtual 孪⽣兄弟⼤不同
 
-invokeinterface ⽤于调⽤接⼜⽅法，在运⾏时再确定⼀个实现此接⼜的对象。 那它跟 invokevirtual 有什么区别呢？为什么不⽤ invokevirtual 来实现接⼜⽅法的调⽤？其实也不是不可以，只是为了效率上的 考量。
+invokeinterface ⽤于调⽤接口⽅法，在运⾏时再确定⼀个实现此接口的对象。 那它跟 invokevirtual 有什么区别呢？为什么不⽤ invokevirtual 来实现接口⽅法的调⽤？其实也不是不可以，只是为了效率上的 考量。
 
-invokestatic 指令需要调⽤的⽅法只属于某个特定的类，在编译期唯⼀确定，不会运⾏时动态变化，是最快的 invokespecial 指令可能调⽤的⽅法也在编译期确定，且只有少数⼏个需要处理的⽅法，查找也 ⾮常快 
+invokestatic 指令需要调⽤的⽅法只属于某个特定的类，在编译期唯⼀确定，不会运⾏时动态变化，是最快的 invokespecial 指令可能调⽤的⽅法也在编译期确定，且只有少数⼏个需要处理的⽅法，查找也⾮常快 
 
-invokevirtual 和 invokeinterface 的关系就⽐较微妙了，区别没有那么明显，我们⽤⼀个实际的例⼦来说明，可以这么认为，每个类⽂件都关联着⼀个「虚⽅法表」（virtual method table），这个表中包含了 ⽗类的⽅法和⾃⼰扩展的⽅法。⽐如
+invokevirtual 和 invokeinterface 的关系就⽐较微妙了，区别没有那么明显，我们⽤⼀个实际的例⼦来说明，可以这么认为，每个类⽂件都关联着⼀个「虚⽅法表」（virtual method table），这个表中包含了⽗类的⽅法和⾃⼰扩展的⽅法。⽐如
 
 ```java
 class A { 
@@ -1179,7 +1184,7 @@ class B extends A {
 
 现在 B 类的虚⽅法表保留了⽗类 A 中⽅法的顺序，只是覆盖了 method2() 指向的函数链接和新增了method4()。 假设这时需要调⽤ method2 ⽅法，invokevirtual 只需要直接去找虚⽅法表位置为 2 的地⽅的 函数引⽤就可以了
 
-如果是⽤ invokeinterface，这样的优化是没法起作⽤的，⽐如，我们改⼀下让 B 实现 X 接⼜
+如果是⽤ invokeinterface，这样的优化是没法起作⽤的，⽐如，我们改⼀下让 B 实现 X 接口
 
 ```java
 interface X { 
@@ -1331,7 +1336,7 @@ vtable 是 Java 实现多态的基⽯，如果⼀个⽅法被继承和重写，�
 
 
 
-下⾯我们在做⼀些实验，让 B 实现接⼜ MyInterface，同时在 B 中新增了⼀个 static ⽅法和⼀个 final ⽅法。
+下⾯我们在做⼀些实验，让 B 实现接口 MyInterface，同时在 B 中新增了⼀个 static ⽅法和⼀个 final ⽅法。
 
 ```java
 public interface MyInterface { 
@@ -1741,7 +1746,7 @@ public static CallSite metafactory(
 
 - caller：JVM 提供的查找上下⽂
 -  invokedName：表⽰调⽤函数名，在本例中 invokedName 为 "run" 
-- samMethodType：函数式接⼜定义的⽅法签名（参数类型和返回值类型），本例中为 run ⽅法的签名 "()void" 
+- samMethodType：函数式接口定义的⽅法签名（参数类型和返回值类型），本例中为 run ⽅法的签名 "()void" 
 - implMethod：编译时⽣成的 lambda 表达式对应的静态⽅法invokestatic Test.lambda$main$0 
 - instantiatedMethodType：⼀般和 samMethodType 是⼀样或是它的⼀个特例，在本例中是 "()void"
 
@@ -1749,37 +1754,1224 @@ metafactory ⽅法的内部细节是整个 lambda 表达式最复杂的地⽅。
 
 <img src="pic/JVM字节码从入门到精通/image-20211115201123645.png" alt="image-20211115201123645" style="zoom:50%;" />
 
-# i++ vs ++i
+跟进 InnerClassLambdaMetafactory 类，看到它在默默⽣成新的内部类，类名的规则是ClassName$$Lambda$1，其中 ClassName 是 lambda 所在的类名，后⾯的数字按⽣成的顺序依次递增。
+
+<img src="pic/JVM字节码从入门到精通/image-20211115220832507.png" alt="image-20211115220832507" style="zoom:40%;" />
+
+同样可以使⽤打印的⽅式看⼀下具体⽣成的类名
+
+```java
+Runnable r = ()->{ 
+  System.out.println("hello, lambda"); 
+};
+
+System.out.println(r.getClass().getName());
+```
+
+输出： 
+
+```shell
+Test$$Lambda$1/1108411398
+```
+
+其中斜杠/后⾯的数字 1108411398 是类对象的 hashcode 值。
+
+InnerClassLambdaMetafactory 这个类的静态初始化⽅法块⾥有⼀个开关可以选择是否把⽣成的类 dump 到磁盘中。
+
+```java
+// For dumping generated classes to disk, for debugging purposes private static final ProxyClassesDumper dumper; 
+static {
+	final String key = "jdk.internal.lambda.dumpProxyClasses"; 
+	String path = AccessController.doPrivileged( 
+    new GetPropertyAction(key), null, new PropertyPermission(key , "read"));
+	dumper = (null == path) ? null : ProxyClassesDumper.getInstance(path); 
+}
+```
+
+使⽤java -Djdk.internal.lambda.dumpProxyClasses=. Test运⾏ Test 类会发现在运⾏期间⽣成了⼀个新的内部类： Test$$Lambda$1.class。这个类正是由InnerClassLambdaMetafactory 使⽤ ASM 字节码 技术动态⽣成的，只是默认情况看不到⽽已。
+
+这个类实现了 Runnable 接口，并在 run ⽅法⾥调⽤了 Test 类的静态⽅法lambda$main$0()。
+
+把这个类的字节码⼈⾁翻译过来是下⾯这样
+
+```java
+final class Test$$Lambda$1 implements Runnable { 
+  @Override 
+  public void run() { 
+    Test.lambda$main$0(); 
+  } 
+}
+```
+
+整个过程就⽐较明朗了:
+
+- lambda 表达式声明的地⽅会⽣成⼀个 invokedynamic 指令，同时编译器⽣成⼀个对应的引导⽅法（Bootstrap Method） 
+- 第⼀次执⾏ invokedynamic 指令时，会调⽤对应的引导⽅法（Bootstrap Method），该引导⽅法会调⽤ LambdaMetafactory.metafactory ⽅法动态⽣成内部类 
+- 引导⽅法会返回⼀个动态调⽤ CallSite 对象，这个 CallSite 会链接最终调⽤的实现了 Runnable 接口的内部类 lambda 表达式中的内容会被编译成静态⽅法，前⾯动态⽣成的内部类会直接调⽤该静态⽅法 
+- 真正执⾏ lambda 调⽤的还是⽤ invokeinterface 指令
+
+## 0x03 为什么 Java 8 的 Lambda 表达式要基于 invokedynamic
+
+关于为什么⽤ invokedynamic 来实现 Lambda，Oracle 的开发者专门写了⼀篇⽂章 Translation of Lambda Expressions，介绍了 Java 8 Lambda 设计时的考虑以及实现⽅法。 ⽂中提到 Lambda 表达式可以通过 内部类、method handle、dynamic proxies 等⽅式实现，但是这些⽅法各有优劣。实现 Lambda 表达式需要达成两个⽬标：
+
+- 为未来的优化提供最⼤的灵活性 
+- 保持类⽂件字节码格式的稳定
+
+使⽤ invokedynamic 可以很好的兼顾这两个⽬标。
+
+原⽂如下
+
+> here are a number of ways we might represent a lambda expression in bytecode, such as inner classes, method handles, dynamic proxies, and others. Each of these approaches has pros and cons. In selecting a strategy, there are two competing goals: maximizing flexibility for future optimization by not committing to a specific strategy, vs providing stability in the classfile representation.
+
+invokedynamic 与之前四个 invoke 指令最⼤的不同就在于它把⽅法分派的逻辑从虚拟机层⾯下放到程序语⾔。 lambda 表达式采⽤的⽅式是不在编译期间就⽣成匿名内部类，⽽是提供了⼀个稳定的字节码 ⼆进制表⽰规范，对⽤户⽽⾔看到的只有 invokedynamic 这样⼀个⾮常简单的指令。⽤ invokedynamic 来实现就是把翻译的逻辑隐藏在 JDK 的实现中，后续想替换实现⽅式⾮常简单，只⽤修改 LambdaMetafactory.metafactory ⾥⾯的逻辑就可以了，这种⽅法把 lambda 翻译的策略由编译期间推迟到运⾏时。
+
+## 0x04 ⼩结
+
+lambda 表达式与普通的匿名内部类的实现⽅式不⼀样，在编译阶段只是新增了⼀个 invokedynamic 指令，并没有在编译期间⽣成匿名内部类，lambda 表达式的内容会被编译成⼀个静态⽅法。在运⾏时 LambdaMetafactory.metafactory 这个⼯⼚⽅法来动态⽣成⼀个内部类 class，该内部类会调⽤前⾯⽣成的静态⽅法。 lambda 表达式最终还是会⽣成⼀个内部类，只不过是不是在编译期间⽽是在运⾏时，未 来的 JDK 会怎么实现 Lambda 表达式可能还会有变化。
+
+## 0x05 思考题
+
+下⾯的两段代码分别会⽣成多少个内部类？为什么?
+
+代码⽚段 1
+
+```java
+for (int i = 0; i < 10; i++) { 
+  Runnable r = () -> { 
+    System.out.println("hello, lambda"); 
+  }; 
+  r.run(); 
+}
+```
+
+代码⽚段 2
+
+```java
+Runnable r1 = () -> { 
+  System.out.println("hello, lambda"); 
+}; 
+r1.run();
+
+Runnable r2 = () -> { 
+  System.out.println("hello, lambda"); 
+}; 
+r2.run();
+```
 
 
 
-# syntactic sugar
+---
 
 
 
-# try-catch-finally 
+# 9. i++ vs ++i
+
+<img src="pic/JVM字节码从入门到精通/image-20211116120710218.png" alt="image-20211116120710218" style="zoom:50%;" />
+
+## 0x01 看⼀道笔试题
+
+```java
+public static void foo() { 
+  int i = 0; 
+  for (int j = 0; j < 50; j++) 
+    i = i++; 
+  System.out.println(i); 
+}
+```
+
+输出结果是 0，⽽不是 50
+
+关于 i++ 和 ++i 的区别，稍微有经验的程序员都或多或少都是了解的。听过了很多道理，依旧过不好这⼀⽣，我们从字节码的⾓度来彻底分析⼀下
+
+```shell
+public static void foo(); 
+	0: iconst_0 
+	1: istore_0 
+	2: iconst_0 
+	3: istore_1 
+	4: iload_1 
+	5: bipush 				50
+	7: if_icmpge			21
+
+ 10: iload_0 
+ 11: iinc 					0, 1
+ 14: istore_0
+
+ 15: iinc 					1, 1
+ 18: goto						4
+
+ 21: getstatic 			#3 				// Field java/lang/System.out:Ljava/io/PrintStream;
+ 24: iload_0 
+ 25: invokevirtual 	#4 				// Method java/io/PrintStream.println:(I)V
+ 28: return
+```
+
+对应i = i++; 的字节码是 10 ~ 14 ⾏：
+
+- 10：iload_0 把局部变量表 slot = 0 的变量(i)加载到操作数栈上 
+- 11：iinc 0, 1 对局部变量表slot = 0 的变量(i)直接加 1，但是这时候栈顶的元素没有变化，还是 0 
+- 14：istore_0 将栈顶元素出栈赋值给局部变量表 slot = 0 的变量，也就是 i。在这时，局部变量 i 又被赋值为 0 了，前⾯的 iinc 指令对 i 的加⼀操作前功尽弃。
+
+<img src="pic/JVM字节码从入门到精通/image-20211115221943471.png" alt="image-20211115221943471" style="zoom:45%;" />
+
+如果要⽤伪代码来理解i = i++ ，应该是下⾯这样的
+
+```shell
+tmp = i; 
+i = i + 1; 
+i = tmp;
+```
+
+## 0x02 ++i 又会是怎么样
+
+把代码稍作修改，如下
+
+```java
+public static void foo() { 
+  int i = 0; 
+  for (int j = 0; j < 50; j++) 
+    i = ++i; 
+  System.out.println(i); 
+}
+```
+
+来看对应的字节码
+
+```shell
+public static void foo(); 
+	0: iconst_0 
+	1: istore_0 
+	2: iconst_0 
+	3: istore_1 
+	4: iload_1 
+	5: bipush 				50 
+	7: if_icmpge 			21
+
+ 10: iinc 					0, 1
+ 13: iload_0 
+ 14: istore_0
+
+ 15: iinc 					1, 1
+ 18: goto						4
+
+ 21: getstatic 			#3 			// Field java/lang/System.out:Ljava/io/PrintStream;
+ 24: iload_0 
+ 25: invokevirtual 	#4 			// Method java/io/PrintStream.println:(I)V
+ 28: return
+```
+
+可以看到i = ++i; 对应的字节码还是 10 ~ 14 ⾏，与 i++ 的字节码对⽐如下图：
+
+<img src="pic/JVM字节码从入门到精通/image-20211115222259235.png" alt="image-20211115222259235" style="zoom:45%;" />
+
+可以看出i = ++i; 先对局部变量表 slot = 0 的变量加 1，然后才把它加载到操作数栈上，随后又从操作数栈上出栈赋值给了局部变量表，最后写回去的值也是最新的值。 画出整个过程的局部变量表和操作数栈的变化如下：
+
+<img src="pic/JVM字节码从入门到精通/image-20211115222336534.png" alt="image-20211115222336534" style="zoom:45%;" />
+
+如果要⽤伪代码来理解i = ++i ，应该是下⾯这样的
+
+```shell
+i = i + 1; 
+tmp = i; 
+i = tmp;
+```
+
+## 0x03 看⼀道难⼀点的题⽬
+
+```java
+public static void bar() { 
+  int i = 0; 
+  i = i++ + ++i; 
+  System.out.println("i=" + i);
+}
+```
+
+输出是什么？ 
+
+同样我们以字节码的⾓度来分析，add 指令的第⼀个参数值为 0，第⼆个参数值为 2，最终输出的结果为 2，详细的分析过程我画了⼀个简单的过程图，如下：
+
+```shell
+public static void bar(); 
+	0: iconst_0 
+	1: istore_0
+
+	2: iload_0 
+	3: iinc 				0, 1
+	6: iinc 				0, 1
+	9: iload_0 
+	10: iadd 
+	11: istore_0
+```
+
+<img src="pic/JVM字节码从入门到精通/image-20211115222559975.png" alt="image-20211115222559975" style="zoom:50%;" />
+
+⽤伪代码的⽅式就是，会不会更好理解⼀些?
+
+```shell
+i = 0;
+tmp1 = i; 
+i = i + 1;
+
+i = i + 1 
+tmp2 = i;
+
+tmpSum = tmp1 + tmp2;
+
+i = tmpSum;
+```
+
+## 0x03 ⼩结
+
+这篇⽂章，我们通过 i++ 与 ++i 字节码的不同讲述了两者的区别，希望能对你后续笔试遇到类似的题⽬有所帮助。 
+
+## 0x04 思考
+
+留⼀道作业题给你，下⾯的代码输出是什么？你可以画出各阶段的过程图吗？
+
+```java
+public static void foo() { 
+  int i = 0; 
+  i = ++i + i++ + i++ + i++; 
+  System.out.println("i=" + i); 
+}
+```
 
 
 
-# try-with-resource
+---
 
 
 
-# Kotlin
+# 10. switch-case
+
+## 0x01 ⼀个⼩ demo
+
+前⾯我们已经知道了，switch-case 依据 case 值的稀疏程度，分别由两个指令 tableswitch 和 lookupswitch 实现，但这两个指令都只⽀持整型值。那怎么样让 String 类型的值也⽀持 switch-case 呢？
+
+```java
+public int test(String name) { 
+  switch (name) { 
+    case "Java":
+			return 100;
+		case "Kotlin":
+			return 200;
+		default:
+			return -1;
+	} 
+}
+```
+
+我们直接来看字节码
+
+```shell
+0: aload_1 
+1: astore_2 
+2: iconst_m1 
+3: istore_3
+
+4: aload_2 
+5: invokevirtual #2 // Method java/lang/String.hashCode:()I 
+8: lookupswitch { // 2
+			-2041707231: 	50 // 对应 "Kotlin".hashCode() 
+					2301506:  36 // 对应 "Java".hashCode() 
+					default: 	61 
+			}
+36: aload_2 
+37: ldc 						#3 			// String Java
+39: invokevirtual 	#4 			// Method java/lang/String.equals:(Ljava/lang/Object;)Z
+42: ifeq 61 
+45: iconst_0 
+46: istore_3 
+47: goto 61
+
+50: aload_2 
+51: ldc 						#5 			// String Kotlin
+53: invokevirtual 	#4 			// Method java/lang/String.equals:(Ljava/lang/Object;)Z
+56: ifeq 61 
+59: iconst_1 
+60: istore_3
+
+61: iload_3 
+62: lookupswitch { // 2 
+				0: 88 
+				1: 91 
+	default: 95 
+	}
+
+// 88 ~ 90 
+88: bipush 						100
+90: ireturn
+
+91: sipush 						200
+94: ireturn
+
+95: iconst_m1 
+96: ireturn
+```
+
+- 0 ~ 3：做⼀些初始化操作，把⼊参 name 赋值给局部变量表下标为 2 的变量，记为 tmpName ，初始化局部变量表 3 位置的变量为 -1，记为 matchIndex 
+- 4 ~ 8：对 tmpName 调⽤了 hashCode 函数，得到⼀个整型值。因为⼀般⽽⾔ hash 都⽐较离散，所以没有选⽤ tableswitch ⽽是⽤ lookupswitch 来作为 switch case 的实现。 
+- 36 47：如果 hashCode 等于 "Java".hashCode() 会跳转到这部分字节码。⾸先把字符串进⾏真正意义上的 equals ⽐较，看是否相等，是否相等使⽤的是 ifeq 指令， ifeq 这个指令语义上有点绕，ifeq 的含义是ifeq 0则跳转到对应字节码⾏处，实际上是等于 false 跳转。这⾥如果相等则把 matchIndex 赋值为 0 
+- 61 ~ 96：进⾏最后的 case 分⽀执⾏。这⼀段⽐较好理解，不再继续做分析。 
+
+结合上⾯的字节码解读，我们可以推演出对应的 Java 代码实现
+
+```java
+public int test_translate(String name) {
+	String tmpName = name; 
+  int matchIndex = -1; 
+  switch (tmpName.hashCode()) { 
+    case -2041707231:
+			if (tmpName.equals("Kotlin")) { 
+        matchIndex = 1; 
+      } 
+      break; 
+    case 2301506:
+			if (tmpName.equals("Java")) { 
+        matchIndex = 0; 
+      } 
+      break; 
+    default:
+			break;
+	} 
+	switch (matchIndex) { 
+  	case 0:
+			return 100; 
+	  case 1:
+			return 200; 
+	  default: 
+  	  return -1;
+	}
+}
+```
+
+## 0x02 hashCode 冲突如何处理
+
+有⼈可能会想，hashCode 冲突的时候要怎么样处理，⽐如 "Aa" 和 "BB" 的 hashCode 都是 2112。
+
+```shell
+public int testSameHash(java.lang.String); 
+descriptor: (Ljava/lang/String;)I 
+flags: ACC_PUBLIC 
+Code:
+	stack=2, locals=4, args_size=2 
+	0: aload_1 
+	1: astore_2 
+	2: iconst_m1 
+	3: istore_3
+
+	4: aload_2 
+	5: invokevirtual 			#2 		// Method java/lang/String.hashCode:()I
+	8: lookupswitch { // 1 
+				2112: 28
+		 default: 53
+			}
+
+	28: aload_2 
+	29: ldc 							#3 		// String BB
+	31: invokevirtual 		#4 		// Method java/lang/String.equals:(Ljava/lang/Object;)Z
+	34: ifeq 42 
+	37: iconst_1 
+	38: istore_3 
+	39: goto 53
+
+	42: aload_2 
+	43: ldc 							#5 		// String Aa
+	45: invokevirtual 		#4 		// Method java/lang/String.equals:(Ljava/lang/Object;)Z
+	48: ifeq 53 
+	51: iconst_0 
+	52: istore_3
+
+	53: iload_3 
+	54: lookupswitch { // 2 
+					0: 80 
+					1: 83 
+		default: 87 
+			} 
+	80: bipush 100 
+	82: ireturn 
+	83: sipush 200 
+	86: ireturn 
+	87: iconst_m1 
+	88: ireturn
+```
+
+可以看到 34 ⾏ 在 hashCode 冲突的情况下，JVM 的处理不过是多⼀次字符串相等的⽐较。与 "BB" 不相等的情况，会继续判断是否等于 "Aa"，翻译为 Java 源代码如下：
+
+```java
+public int testSameHash_translate(String name) { 
+  String tmpName = name; 
+  int matchIndex = -1;
+
+	switch (tmpName.hashCode()) {
+		case 2112:
+			if (tmpName.equals("BB")) { 
+        matchIndex = 1; 
+      } else if (tmpName.equals("Aa")) { 
+        matchIndex = 0; 
+      } 
+      break; 
+    default:
+      break;
+	}
+
+	switch (matchIndex) { 
+    case 0:
+			return 100; 
+    case 1:
+      return 200; 
+    default:
+      return -1; 
+  }
+}
+```
+
+## 0x03 ⼩结
+
+总结⼀下，JDK7 引⼊的 String 的 switch 实现流程分为下⾯⼏步：
+
+1. 计算字符串 hashCode
+
+2. 使⽤ lookupswitch 对整型 hashCode 进⾏分⽀
+
+3. 对相同 hashCode 值的字符串进⾏最后的字符串匹配
+
+4. 执⾏ case 块代码
+
+## 0x04 思考
+
+最后，给你留两道思考题
+
+1. Java 的 hashCode 冲突的概率其实是很⼤的，其底层原因是什么？
+
+2. 你可以随意构造两个 hashCode 相同的字符串吗？它们有什么规律
+
+# 11. try-catch-finally 
+
+<img src="pic/JVM字节码从入门到精通/image-20211116120633601.png" alt="image-20211116120633601" style="zoom:50%;" />
+
+Java笔试中，经常会考 try catch finally 执⾏顺序和返回值的问题，⼤部分都只在书⾥⾯看过，说 finally ⼀定会执⾏。其背后的原因值得深究，看看try catch finally 这个语法糖背后的实现原理
+
+## 0x01 try catch 字节码分析
+
+```java
+public class TryCatchFinallyDemo { 
+  public void foo() { 
+    try { 
+      tryItOut1(); 
+    } catch (MyException1 e) { 
+      handleException(e); 
+    } 
+  } 
+}
+```
+
+<img src="pic/JVM字节码从入门到精通/image-20211116080742735.png" alt="image-20211116080742735" style="zoom:50%;" />
+
+在编译后字节码中，每个⽅法都附带⼀个异常表（Exception table），异常表⾥的每⼀⾏表⽰⼀个异常处理器，由 from 指针、to 指针、target 指针、所捕获的异常类型 type 组成。这些指针的值是字节码索 引，⽤于定位字节码 其含义是在[from, to)字节码范围内，抛出了异常类型为type的异常，就会跳转到target表⽰的字节码处。 ⽐如，上⾯的例⼦异常表表⽰：在0到4中间（不包含 4）如果抛出 了MyException1 的异常，就跳转到7执⾏。
+
+当有多个的catch的情况下，又会是怎样？
+
+```java
+public void foo() { 
+  try { 
+    tryItOut2(); 
+  } catch (MyException1 e) { 
+    handleException1(e); 
+  } catch (MyException2 e) { 
+    handleException2(e); 
+  } 
+}
+```
+
+对应字节码如下：
+
+<img src="pic/JVM字节码从入门到精通/image-20211116103453320.png" alt="image-20211116103453320" style="zoom:50%;" />
+
+可以看到多⼀个异常，会在异常表（Exception table ⾥⾯多⼀条记录）。
+
+当程序出现异常时，Java 虚拟机会从上⾄下遍历异常表中所有的条⽬。当触发异常的字节码索引值在某个异常条⽬的[from, to)范围内，则会判断抛出的异常与该条⽬想捕获的异常是否匹配。
+
+- 如果匹配，Java 虚拟机会将控制流跳转到 target 指向的字节码；如果不匹配则继续遍历异常表 
+- 如果遍历完所有的异常表，还未匹配到异常处理器，那么该异常将蔓延到调⽤⽅（caller）中重复上述的操作。最坏的情况下虚拟机需要遍历该线程 Java 栈上所有⽅法的异常表
+
+## 0x02 finally 字节码分析
+
+finally 的字节码分析最为有意思，之前我⼀直以为 finally 的实现是⽤简单的跳转来实现的，实际上并⾮如此。⽐如下⾯的代码
+
+```java
+public void foo() { 
+  try { 
+    tryItOut1(); 
+  } catch (MyException1 e) { 
+    handleException(e); 
+  } finally { 
+    handleFinally(); 
+  } 
+}
+```
+
+对应的字节码如下：
+
+<img src="pic/JVM字节码从入门到精通/image-20211116103646818.png" alt="image-20211116103646818" style="zoom:50%;" />
+
+可以看到，字节码中包含了三份 finally 语句块，都在程序正常 return 和异常 throw 之前。其中两处在 try 和 catch 调⽤ return 之前，⼀处是在异常 throw 之前。 Java 采⽤⽅式是复制 finally 代码块的内容，分别放在 try catch 代码块所有正常 return 和 异常 throw 之前。 相当于如下的代码：
+
+```java
+public void foo() {
+	try { 
+    tryItOut1(); 
+    handleFinally(); 
+  } catch (MyException1 e) { 
+    handleException(e); 
+    handleFinally(); 
+  } catch (Throwable e) { 
+    handleFinally(); 
+    throw e; 
+  }
+}
+```
+
+整个过程如下图所⽰
+
+<img src="pic/JVM字节码从入门到精通/image-20211116103835411.png" alt="image-20211116103835411" style="zoom:50%;" />
+
+这样就解释了我们⼀直以来被灌输的观点，finally语句⼀定会执⾏
+
+## 0x03 ⾯试题解析
+
+这⾥有⼀个笔试中特别喜欢考，但是实际⽤处不⼤的场景：在 finally 中有 return 的情况 。
+
+有了上述分析，就⽐较简单了，如果 finally 中有 return，因为它先于其它的执⾏，会覆盖其它的返回（包括异 常）
+
+题⽬1： 
+
+```java
+public static int func() { 
+  try { 
+    return 0; 
+  } catch (Exception e){ 
+    return 1; 
+  } finally { 
+    return 2; 
+  } 
+} 
+// 返回 2
+```
+
+题⽬2： 
+
+```java
+public static int func() { 
+  try { 
+    int a = 1 / 0; 
+    return 0; 
+  } catch (Exception e) { 
+    return 1; 
+  } finally { 
+    return 2; 
+  } 
+} 
+// 返回 2
+```
+
+题⽬3： 
+
+```java
+public static int func() { 
+  try { 
+    int a = 1 / 0; 
+    return 0; 
+  } catch (Exception e) { 
+    int b = 1 / 0; 
+  } finally { 
+    return 2; 
+  } 
+} 
+// 返回 2
+```
+
+ 问题4:
+
+<img src="pic/JVM字节码从入门到精通/image-20211116111343125.png" alt="image-20211116111343125" style="zoom:50%;" />
+
+问题是：字节码中的第 10 ⾏ astore 4 是什么意思，栈上不都是空的吗？还有为什么显⽰局部变量 locals 个数等于 5，不是只有 this、s1、s2 这 3 个吗？
+
+先来看astore_3这个字节码，其实是把 s1 的引⽤存储到局部变量表 slot 为 3 的位置上。第 10 ⾏的astore 4 是什么呢？从异常表（Exception table）可以看到第 10 ⾏开始是异常处理的逻辑，这个时候栈顶 并⾮是空的，栈顶元素就是抛出的异常，astore 4 将这个异常放到局部变量表中 slot 为 4 的位置。因此最后⼀个局部变量也清楚了。局部变量表列表如下：
+
+```shell
+0：this 
+1：s1 
+2：s2 
+3：tmp_s1 
+4：exception
+```
+
+如果上⾯的例⼦还不够清楚直接，可以再来⼀段代码
+
+<img src="pic/JVM字节码从入门到精通/image-20211116115420316.png" alt="image-20211116115420316" style="zoom:50%;" />
+
+字节码中 12 ⾏开始是异常处理的逻辑，字节码16: aload_2 17: athrow ，通过 athrow 可以知道局部变量表中位置为 2 的变量是⼀个异常。与上⾯的例⼦是⼀样的。
+
+## 0x05 ⼩结
+
+这篇⽂章我们讲了 try-catch-finally 语句块的底层字节码实现，⼀起来回顾⼀下要点：
+
+- 第⼀，JVM 采⽤异常表的⽅式来处理 try-catch 的跳转逻辑；
+- 第⼆，finally 的实现采⽤拷贝 finally 语句块的⽅式来实现 finally ⼀定会执⾏的语义逻辑； 
+- 第三，讲解了⾯试喜欢考的在 finally 中有 return 语句或者 抛异常的情况。
+
+## 0x06 作业题
+
+最后，给你留两道作业题。 1、下⾯代码输出什么，原因是什么
+
+```java
+public static int foo() { 
+  int x = 0; 
+  try { 
+    return x; 
+  } finally { 
+    ++x; 
+  } 
+}
+
+public static void main(String[] args) { 
+  int res = foo(); 
+  System.out.println(res); 
+}
+// 输出 0
+```
+
+2、低版本的 JDK 采⽤ jsr/ret 来实现 finally 语句块，你可以去了解⼀下这两个指令的作⽤，实现⼀下 finally 语义吗？
+
+# 12. try-with-resource
+
+<img src="pic/JVM字节码从入门到精通/image-20211116120554956.png" alt="image-20211116120554956" style="zoom:50%;" />
+
+Java 7中的 try-with-resource，在没有这个语法糖的情况下的等价实现是什么？ 以下⾯的 demo 为例，这个问题⽬测 99%的⼈都写不完全正确，不信来战。
+
+## 0x01 初试⽜⼑
+
+```java
+public static void foo() throws Exception { 
+  try (AutoCloseable c = dummy()) { 
+    bar(); 
+  } 
+}
+
+public static void bar() { 
+  // may throw exception 
+}
+```
+
+我们凭第⼀感觉来写⼀下：
+
+```java
+public static void foo() throws Exception {
+	AutoCloseable c = null; 
+  try { 
+    c = dummy(); 
+    bar(); 
+  } finally { 
+    if (c != null) { 
+      c.close(); 
+    } 
+  }
+}
+```
+
+看起来没什么问题，但是仔细想⼀下，如果bar()抛出了异常e1，c.close()也抛出了异常e2，调⽤者会收到哪个呢？ 我们来回顾⼀下Java基础，try catch finally 部分
+
+```java
+public static void foo() { 
+  try { 
+    throw new RuntimeException("in try"); 
+  } finally { 
+    throw new RuntimeException("in finally" ); 
+  } 
+}
+```
+
+调⽤foo()函数最终会抛出什么异常呢？ 运⾏⼀下： Exception in thread "main" java.lang.RuntimeException: in finally
+
+try中抛出的异常，就被finally 中抛出的异常淹没掉了。
+
+## 0x02 suppressed 异常是什么
+
+回到刚刚的问题，如果 bar() 和 c.close()同时抛了异常，那么调⽤端应该会收到c.close()抛出的异常e2, 往往这并不是我们想要的。那么怎么样抛出 try 中的异常，同时又不丢掉 finally 中的异常呢？ 
+
+> Java 7 中 为 Throwable 类 增 加 的 addSuppressed ⽅ 法。当 ⼀ 个异 常 被 抛 出 的 时 候 , 可 能 有 其 他 异 常 因 为 该 异 常 ⽽ 被 抑 制 住 , 从 ⽽ ⽆ 法 正 常 抛 出 。 这时 可 以 通过addSuppressed ⽅ 法 把 这 些 被 抑 制 的 ⽅ 法 记 录 下 来 。 被 抑 制 的 异 常 会 出 现在 抛 出 的 异 常 的 堆 栈 信 息 中 , 也 可 以 通 过 getSuppressed ⽅ 法 来 获 取 这 些 异 常 。 这 样做 的好处是不会丢失任何异常,⽅便开发⼈员进⾏调试。
+
+ 有了上述概念，我们进⾏改写
+
+```java
+public static void foo() throws Exception {
+	AutoCloseable c = null; 
+  Exception tmpException = null; 
+  try {
+		c = dummy();
+		bar(); 
+  } catch (Exception e) {
+		tmpException = e;
+		throw e; 
+  } finally {
+		if (c != null) {
+			if (tmpException != null) { 
+        try { 
+          c.close(); 
+        } catch (Exception e) { 
+          tmpException.addSuppressed(e); 
+        }
+			} else { 
+        c.close();
+			}
+		}
+	}
+}
+```
+
+验证我们的想法 javap -c 查看字节码：
+
+```shell
+public static void foo() throws java.lang.Exception;
+	Code:
+		0: invokestatic 		#2	  // Method dummy:()Ljava/lang/AutoCloseable; 
+		3: astore_0 
+		4: aconst_null 
+		5: astore_1
+
+		6: invokestatic			#3		// Method bar:()V
+
+		9: aload_0 
+	 10: ifnull 					86
+	 13: aload_1 
+	 14: ifnull						35
+
+	 17: aload_0 
+	 18: invokeinterface 	#4, 1	// InterfaceMethod java/lang/AutoCloseable.close:()V
+	 23: goto 						86
+
+	 26: astore_2 
+	 27: aload_1 
+	 28: aload_2 
+	 29: invokevirtual 		#6 		// Method java/lang/Throwable.addSuppressed:(Ljava/lang/Throwable;)V
+	 32: goto 						86 
+	 35: aload_0 
+	 36: invokeinterface 	#4, 1  // InterfaceMethod java/lang/AutoCloseable.close:()V
+	 41: goto 						86
+
+	 44: astore_2 
+	 45: aload_2 
+	 46: astore_1 
+	 47: aload_2 
+	 48: athrow
+
+   49: astore_3 
+   50: aload_0 
+   51: ifnull 					84
+   54: aload_1 
+   55: ifnull						78
+
+	 58: aload_0 
+	 59: invokeinterface 	#4, 1  // InterfaceMethod java/lang/AutoCloseable.close:()V
+	 64: goto 						84
+
+	 67: astore						4
+	 69: aload_1 
+	 70: aload 						4 
+	 72: invokevirtual 		#6 		 // Method java/lang/Throwable.addSuppressed:(Ljava/lang/Throwable;)V
+	 75: goto 						84 
+	 78: aload_0 
+	 79: invokeinterface 	#4, 1  // InterfaceMethod java/lang/AutoCloseable.close:()V
+	 84: aload_3 
+	 85: athrow 
+	 86: return 
+Exception table:
+	from to target type 
+	17 23 26 Class java/lang/Throwable 
+	 6  9 44 Class java/lang/Throwable 
+	 6  9 49 any 
+	58 64 67 Class java/lang/Throwable 
+	44 50 49 any
+```
+
+从字节码的细节可以看到基本跟我们最后的逻辑⼀致。
+
+## 0x03 ⼩结
+
+这篇⽂章我们讲了 try with resource 语句块的底层字节码实现，⼀起来回顾⼀下要点：
+
+- 第⼀，try-with-resource 语法并不是简单的在 finally ⾥中加⼊了closable.close()⽅法，因为 finally 中的 close ⽅法如果抛出了异常会淹没真正的异常； 
+- 第⼆，引⼊了 suppressed 异常的概念，能抛出真正的异常，且会调⽤ addSuppressed 附带上 suppressed 的异常。
+
+## 0x04 思考
+
+留⼀个作业：我们没有逐⾏解析 0x02 中的字节码，你能逐⾏分析⼀下每条字节码的含义吗？
+
+# 13. Kotlin
 
 
 
-# synchronized
+# 14. synchronized
+
+<img src="pic/JVM字节码从入门到精通/image-20211116151950900.png" alt="image-20211116151950900" style="zoom:50%;" />
+
+这篇⽂章我们将深⼊的分析 synchronized 关键字在字节码层⾯是如何实现的
+
+## 0x01 代码块级别的 synchronized
+
+```java
+private Object lock = new Object(); 
+public void foo() {
+	synchronized (lock) {
+		bar();
+	} 
+}
+public void bar() { }
+```
+
+编译成字节码如下
+
+```shell
+public void foo(); 
+	Code: 
+		0: aload_0 
+		1: getfield 			#3		// Field lock:Ljava/lang/Object;
+		4: dup 
+		5: astore_1
+
+		6: monitorenter
+		
+		7: aload_0 
+		8: invokevirtual 	#4		// Method bar:()V
+
+	 11: aload_1 
+	 12: monitorexit 
+	 13: goto						21
+
+	 16: astore_2 
+	 17: aload_1 
+	 18: monitorexit 
+	 19: aload_2 
+	 20: athrow 
+	 21: return 
+Exception table:
+	from to target type 
+		 7 13 	16  	any 
+		16 19 	16	  any
+```
+
+Java 虚拟机中代码块的同步是通过 monitorenter 和 monitorexit 两个⽀持 synchronized 关键字语意的。⽐如上⾯的字节码
+
+- 0 ~ 5：将 lock 对象⼊栈，使⽤ dup 指令复制栈顶元素，并将它存⼊局部变量表位置 1 的地⽅，现在栈上还剩下⼀个 lock 对象 
+- 6：以栈顶元素 lock 做为锁，使⽤ monitorenter 开始同步 
+- 7 ~ 8：调⽤ bar() ⽅法
+- 11 ~ 12：将 lock 对象⼊栈，调⽤ monitorexit 释放锁
+
+monitorenter 对操作数栈的影响如下
+
+<img src="pic/JVM字节码从入门到精通/image-20211116152627713.png" alt="image-20211116152627713" style="zoom:50%;" />
+
+- 16 ~ 20：执⾏异常处理，我们代码中本来没有 try-catch 的代码，为什么字节码会帮忙加上这段逻辑呢？
+
+因为编译器必须保证，⽆论同步代码块中的代码以何种⽅式结束（正常 return 或者异常退出），代码中每次调⽤ monitorenter 必须执⾏对应的 monitorexit 指令。为了保证这⼀点，编译器会⾃动⽣成⼀个 异常处理器，这个异常处理器的⽬的就是为了同步代码块抛出异常时能执⾏ monitorexit。这也是字节码中，只有⼀个 monitorenter 却有两个 monitorexit 的原因 
+
+可理解为这样的⼀段 Java 代码
+
+```java
+public void _foo() throws Throwable { 
+  monitorenter(lock); 
+  try { 
+    bar(); 
+  } finally { 
+    monitorexit(lock); 
+  } 
+}
+```
+
+根据我们之前介绍的 try-catch-finally 的字节码实现原理，复制 finally 语句块到所有可能函数退出的地⽅，上⾯的代码等价于
+
+```java
+public void _foo() throws Throwable { 
+  monitorenter(lock); 
+  try { 
+    bar(); 
+    monitorexit(lock); 
+  } catch (Throwable e) { 
+    monitorexit(lock); 
+    throw e; 
+  } 
+}
+```
+
+## 0x02 ⽅法级的 synchronized
+
+⽅法级的同步与上述有所不同，它是由常量池中⽅法的 ACC_SYNCHRONIZED 标志来隐式实现的。
+
+```java
+synchronized public void testMe() { }
+```
+
+对应字节码
+
+```shell
+public synchronized void testMe(); 
+descriptor: ()V 
+flags: ACC_PUBLIC, ACC_SYNCHRONIZED
+```
+
+JVM 不会使⽤特殊的字节码来调⽤同步⽅法，当 JVM 解析⽅法的符号引⽤时，它会判断⽅法是不是同步的（检查⽅法 ACC_SYNCHRONIZED 是否被设置）。
+
+如果是，执⾏线程会先尝试获取锁。如果是 实例⽅法，JVM 会尝试获取实例对象的锁，如果是类⽅法，JVM 会尝试获取类锁。在同步⽅法完成以后，不管是正常返回还是异常返回，都会释放锁
+
+## 0x03 ⼩结
+
+这篇⽂章我们讲了 synchronized 关键字在字节码层⾯的实现细节，⼀起来回顾⼀下要点：
+
+- 第⼀，代码块级别的 synchronized 是使⽤ monitorenter、monitorexit 指令来实现的，monitorexit 会在所有可能退出 的地⽅调⽤（正常退出、异常退出），以实现 monitorexit ⼀定会调⽤的语义。
+- 第⼆，⽅法级的 synchronized 是 JVM 隐式实现的，没有成对的 monitorenter-monitorexit 语句块。
+
+## 0x04 思考
+
+留⼀道作业题：monitorenter 和 monitorexit 底层做了什么？跟 Java 的对象头有什么关系？
+
+欢迎你在留⾔区留⾔，和我⼀起讨论。
+
+# 15. java泛型
+
+<img src="pic/JVM字节码从入门到精通/image-20211116153403987.png" alt="image-20211116153403987" style="zoom:50%;" />
+
+Java 泛型是 JDK5 引进的新特性，对于泛型的引⼊，社区褒贬不⼀，好的地⽅是泛型可以在编译期帮我们发现⼀些明显的问题，不好的地⽅是泛型在设计上因为考虑兼容性等原因，留下了⽐较⼤的坑。 ⽹上有很多喷 Java 的泛型设计，甚⾄《Thinking in Java》的作者都发表了⼀篇⽂章来批评 JDK5 中的泛型实现，知乎也有很多类似的帖⼦。 Java 泛型更像是⼀个 Java 语⾔的语法糖，我们将从字节码的⾓度分析⼀下泛型。
+
+## 0x01 当泛型遇到重载
+
+```java
+public void print(List<String> list) { } 
+public void print(List<Integer> list) { }
+```
+
+上⾯的代码编译的时候会报错，提⽰name clash: print(List<Integer>) and print(List<String>) have the same erasure 这两个函数对应的字节码都是
+
+```shell
+descriptor: (Ljava/util/List;)V 
+Code:
+	stack=0, locals=2, args_size=2 
+		0: return 
+	LocalVariableTable:
+		Start Length Slot Name Signature 
+			0 		1 		0 	this LMyClass;
+			0 		1 		1 	list Ljava/util/List;
+```
+
+为了弄懂这个问题，需要先了解泛型的类型擦除
+
+## 0x02 泛型的核⼼概念：类型擦除（type erasure）
+
+理解泛型概念的最重要的是理解类型擦除。Java 的泛型是在 javac 编译期这个级别实现的。在⽣成的字节码中，已经不包含类型信息了。这种在泛型使⽤时加上类型参数，在编译时被抹掉的过程被称为泛 型擦除。 
+
+⽐如在代码中定义：List<String> 与 List<Integer> 在编译以后都变成了 List。JVM 看到的只是 List，⽽ JVM 不允许相同签名的函数在⼀个类中同时存在，所以上⾯代码中编译⽆法通过。 
+
+由泛型附加的类型信息对 JVM 来说是不可见的。Java 编译器会在编译时尽可能的发现可能出错的地⽅，但是也不是万能的。 很多泛型的奇怪语法规定都与类型擦除的存在有关
+
+- 泛型类并没有⾃⼰独有的 Class 类对象，⽐如并不存在 List<String>.class 或是 List<Integer>.class，⽽只有 List.class。 
+- 泛型的类型参数不能⽤在 Java 异常处理的 catch 语句中。因为异常处理是由 JVM 在运⾏时刻来进⾏的。由于类型信息被擦除，JVM 是⽆法区分两个异常类型 和 MyException<Integer>的。对于 JVM 来说，它们都是 MyException 类型的 MyException<String>
+
+## 0x03 泛型真的被完全擦除了吗
+
+学习泛型的时候，我们被⼤量的⽂章警⽰「泛型信息在编译之后是拿不到的，因为已经被擦除掉」，真的是这样吗？ 我们在 javac 编译的时候加上 -g 参数⽣成更多的调试信息，使⽤ javap -c -v -l 来查看字节码时可以看到更多有⽤的信息
+
+```shell
+public void print(java.util.List<java.lang.String>);
+	descriptor: (Ljava/util/List;)V 
+		stack=0, locals=2, args_size=2 
+			0: return 
+		LocalVariableTypeTable:
+			Start Length Slot Name Signature 
+					0 		1 		1 list Ljava/util/List<Ljava/lang/String;>; 
+			Signature: #18 					// (Ljava/util/List<Ljava/lang/String;>;)V
+```
+
+LocalVariableTypeTable 和 Signature 是针对泛型引⼊的新的属性，⽤来解决泛型的参数类型识别问题，Signature 最为重要，它的作⽤是存储⼀个⽅法在字节码层⾯的特征签名，这个属性保存的不是原⽣ 类型，⽽是包括了参数化类型的信息。我们依然可以通过反射的⽅式拿到参数的类型。所谓的擦除，只是把⽅法 code 属性的字节码进⾏擦除。 
+
+## 0x04 ⼩结
+
+这篇⽂章我们讲解了字节码在 Java 泛型上的应⽤，⼀起来回顾⼀下要点：第⼀，由于类型擦除的存在，List<String>.class、List<Integer>.class在 JVM 层⾯只有 List.class，因此泛型在重载上有⼀些 问题。第⼆，通过 javap 可以看到泛型的类型擦除并不是完全擦除了，字节码中 Signature 域存储了⽅法带有泛型的签名。
+
+## 0x05 思考
+
+留⼀道作业题：下⾯的代码，你可以看出为什么 Java 编译器会提⽰编译错误吗？
+
+```java
+public void inspect(List<Object> list) { } 
+public void test() {
+	List<String> strs = new ArrayList<String>();
+	inspect(strs); // 编译错误 
+}
+```
 
 
 
-# java泛型
+---
+
+
+
+# 16. 反射背后的原理
+
+在 Java 中反射随处可见，它底层的原也⽐较有意思，这篇⽂章来详细介绍反射背后的原理。
+
+## 0x01 一个例子
+
+先来看下⾯这个例⼦：
+
+```java
+public class ReflectionTest {
+	private static int count = 0; 
+  public static void foo() { 
+    new Exception("test#" + (count++)).printStackTrace(); 
+  }
+
+	public static void main(String[] args) throws Exception { 
+    Class<?> clz = Class.forName("ReflectionTest"); 
+    Method method = clz.getMethod("foo"); 
+    for (int i = 0; i < 20; i++) { 
+      method.invoke(null);
+    } 
+  }
+}
+```
+
+运⾏结果如下
+
+<img src="pic/JVM字节码从入门到精通/image-20211116153956131.png" alt="image-20211116153956131" style="zoom:50%;" />
+
+可以看到同⼀段代码，运⾏的堆栈结果与执⾏次数有关系，在 0 ~ 15 次调⽤⽅式为sun.reflect.NativeMethodAccessorImpl.invoke0，从第 16 次开始调⽤⽅式变为 了sun.reflect.GeneratedMethodAccessor1.invoke。原因是什么呢？继续往下看。
+
+## 0x02 反射⽅法源码分析
+
+Method.invoke 源码如下：
+
+<img src="pic/JVM字节码从入门到精通/image-20211116154152989.png" alt="image-20211116154152989" style="zoom:50%;" />
+
+可以最终调⽤了MethodAccessor.invoke⽅法，MethodAccessor 是⼀个接⼜
+
+```java
+public interface MethodAccessor { 
+  public Object invoke(Object obj, Object[] args) throws IllegalArgumentException, InvocationTargetException; 
+}
+```
+
+从输出的堆栈可以看到 MethodAccessor 的实现类是委托类DelegatingMethodAccessorImpl，它的 invoke 函数⾮常简单，就是把调⽤委托给了真正的实现类。
+
+```java
+class DelegatingMethodAccessorImpl extends MethodAccessorImpl {
+	private MethodAccessorImpl delegate; 
+  public Object invoke(Object obj, Object[] args) throws IllegalArgumentException, InvocationTargetException {
+	return delegate.invoke(obj, args); 
+  }
+```
+
+通过堆栈可以看到在第 0 ~ 15 次调⽤中，实现类是 NativeMethodAccessorImpl，从第 16 次调⽤开始实现类是 GeneratedMethodAccessor1，为什么是这样呢？⽞机就在 NativeMethodAccessorImpl 的 invoke ⽅法中
+
+<img src="pic/JVM字节码从入门到精通/image-20211116154308809.png" alt="image-20211116154308809" style="zoom:50%;" />
+
+前 0 ~ 15 次都会调⽤到invoke0 ，这是⼀个 native 的函数。
+
+```java
+private static native Object invoke0(Method m, Object obj, Object[] args);
+```
+
+有兴趣的同学可以去看⼀下 Hotspot 的源码，依次跟踪下⾯的代码和函数：
+
+> ./jdk/src/share/native/sun/reflect/NativeAccessors.c
+>
+> JNIEXPORT jobject JNICALL Java_sun_reflect_NativeMethodAccessorImpl_invoke0 (JNIEnv *env, jclass unused, jobject m, jobject obj, jobjectArray args)
+>
+> ./hotspot/src/share/vm/prims/jvm.cpp JVM_ENTRY(jobject, JVM_InvokeMethod(JNIEnv *env, jobject method, jobject obj, jobjectArray args0))
+>
+> ./hotspot/src/share/vm/runtime/reflection.cpp oop Reflection::invoke_method(oop method_mirror, Handle receiver, objArrayHandle args, TRAPS)
+>
+
+这⾥不详细展开 native 实现的细节。
+
+
+
+15 次以后会⾛新的逻辑，使⽤ GeneratedMethodAccessor1 来调⽤反射的⽅法。MethodAccessorGenerator 的作⽤是通过 ASM ⽣成新的类 sun.reflect.GeneratedMethodAccessor1。为了查看整个类的内容， 可以使⽤阿⾥的 [arthas](https://arthas.aliyun.com/doc/) ⼯具。修改上⾯的代码，在 main 函数的最后加上System.in.read(); 让 JVM 进程不要退出。 执⾏ arthas ⼯具中的./as.sh ，会要求输⼊ JVM 进程
+
+<img src="pic/JVM字节码从入门到精通/image-20211116154543506.png" alt="image-20211116154543506" style="zoom:50%;" />
+
+选择在运⾏的 ReflectionTest 进程号 7 就进⼊到了 arthas 交互性界⾯。执⾏ dump sun.reflect.GeneratedMethodAccessor1⽂件就保存到了本地。
+
+<img src="pic/JVM字节码从入门到精通/image-20211116154609980.png" alt="image-20211116154609980" style="zoom:50%;" />
+
+来看下这个类的字节码
+
+<img src="pic/JVM字节码从入门到精通/image-20211116154628679.png" alt="image-20211116154628679" style="zoom:50%;" />
+
+⼈⾁翻译⼀下这个字节码，忽略掉异常处理以后的代码如下
+
+```java
+public class GeneratedMethodAccessor1 extends MethodAccessorImpl { 
+  @Override 
+  public Object invoke(Object obj, Object[] args) throws IllegalArgumentException, InvocationTargetException { 
+    ReflectionTest.foo(); 
+    return null; 
+  } 
+}
+```
+
+那为什么要采⽤ 0 ~ 15 次使⽤ native ⽅式来调⽤，15 次以后使⽤ ASM 新⽣成的类来处理反射的调⽤呢？
+
+⼀切都是基于性能的考虑。JNI native 调⽤的⽅式要⽐动态⽣成类调⽤的⽅式慢 20 倍，但是又由于第⼀次字节码⽣成的过程⽐较慢。如果反射仅调⽤⼀次的话，采⽤⽣成字节码的⽅式反⽽⽐ native 调⽤ 的⽅式慢 3 ~ 4 倍。
+
+## 0x03 inflation 机制
+
+因为很多情况下，反射只会调⽤⼀次，因此 JVM 想了⼀招，设置了 15 这个 sun.reflect.inflationThreshold 阈值，反射⽅法调⽤超过 15 次时（从 0 开始），采⽤ ASM ⽣成新的类，保证后⾯的调⽤⽐ native 要快。如果⼩于 15 次的情况下，还不如⽣成直接 native 来的简单直接，还不造成额外类的⽣成、校验、加载。这种⽅式被称为 「inflation 机制」。inflation 这个单词也⽐较有意思，它的字⾯意思是 「膨胀；通货膨胀」。
+
+JVM 与 inflation 相关的属性有两个，⼀个是刚提到的阈值 sun.reflect.inflationThreshold，还有⼀个是是否禁⽤ inflation的属性 sun.reflect.noInflation，默认值为 false。如果把这个值设置成true 的 话，从第 0 次开始就使⽤动态⽣成类的⽅式来调⽤反射⽅法了，不会使⽤ native 的⽅式。
+
+增加 noInflation 属性重新执⾏上述 Java 代码
+
+```shell
+java -cp . -Dsun.reflect.noInflation=true ReflectionTest
+```
+
+输出结果为
+
+```shell
+java.lang.Exception: test#0 
+		at ReflectionTest.foo(ReflectionTest.java:10) 
+		at sun.reflect.GeneratedMethodAccessor1.invoke(Unknown Source) 
+		at java.lang.reflect.Method.invoke(Method.java:497) 
+		at ReflectionTest.main(ReflectionTest.java:18) 
+java.lang.Exception: test#1 
+		at ReflectionTest.foo(ReflectionTest.java:10) 
+		at sun.reflect.GeneratedMethodAccessor1.invoke(Unknown Source) 
+		at java.lang.reflect.Method.invoke(Method.java:497) 
+		at ReflectionTest.main(ReflectionTest.java:18)
+```
+
+可以看到，从第 0 次开始就已经没有使⽤ native ⽅法来调⽤反射⽅法了。
+
+## 0x04 ⼩结 
+
+这篇⽂章主要介绍了 Java ⽅法反射调⽤底层的原理，主要有两种⽅式 
+
+- native ⽅法 
+- 动态⽣成类的⽅式 
+
+native 调⽤的⽅式⽐ Java 类直接调⽤的⽅式慢 20 倍，但是第⼀次⽣成动态类又⽐较耗时，因此 JVM 才有了⼀个优化策略，在某阈值之前使⽤ native 调⽤，在此阈值之后使⽤动态⽣成类的⽅式。这样既 可以保证在反射⽅法少数调⽤的情况下，不⽤⽣成新的类，又可以保证调⽤次数很多的情况下使⽤性能更优的动态类的⽅式。
+
+## 0x05 思考题
+
+现实中⼤量使⽤反射调⽤的项⽬，inflation 机制可能造成哪些隐患呢？
+
+
+
+---
 
 
 
 # javac 编译原理
-
-## javac 源码调试
 
 
 
