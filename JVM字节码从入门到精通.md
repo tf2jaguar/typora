@@ -169,7 +169,11 @@ public class Hello {
 
 最后，给你留⼀个思考题，javap 的 -l 参数有什么⽤？ 欢迎你在留⾔区留⾔，和我⼀起讨论。
 
+
+
 ---
+
+
 
 # 2. jvm的运行
 
@@ -699,7 +703,11 @@ table_space_cost + 3 * table_time_cost <= lookup_space_cost + 3 * lookup_time_co
 
 最后，给你留⼀个道作业题，switch-case 语句⽀持枚举类型，你能通过分析字节码写出其底层的实现原理吗？
 
+
+
 ---
+
+
 
 # 4. 对象相关字节码
 
@@ -1223,8 +1231,13 @@ invokedynamic 是五种 invoke ⾥⾯最复杂的，下⼀篇⽂章将专门介�
 最后，给你留两道思考题
 
 1. invokestatic、invokevirtual、invokespecial、invokeinterface 这四个指令调⽤效率的排序是怎么样的？
-
 2. JDK8 的 lambda 表达式为什么采⽤ invokedynamic 来实现？跟匿名内部类的⽅式相⽐有哪些优点？
+
+
+
+---
+
+
 
 # 6. 通过 HSDB ⼯具窥探 JVM 运⾏时数据
 
@@ -1379,6 +1392,12 @@ public class B extends A implements MyInterface {
 
 - 笨神的⽂章：http://lovestblog.cn/blog/2014/06/28/hsdb-string/ 
 - R ⼤的⽂章：https://rednaxelafx.iteye.com/blog/1847971
+
+
+
+---
+
+
 
 # 7. invokedynamic
 
@@ -1607,6 +1626,12 @@ Groovy 采⽤ invokedynamic 指令有哪些好处?
 ## 0x06 ⼩结
 
 这篇⽂章主要介绍了 invokedynamic 指令的原理。invokedynamic 其实是⼀种调⽤⽅法的新⽅式，它⽤来告诉 JVM 可以延迟确认最终要调⽤的哪个⽅法。⼀开始 invokedynamic 并不知道要调⽤什么⽬标⽅ 法。第⼀次调⽤时引导⽅法（Bootstrap Method）会被调⽤，由这个引导⽅法决定哪个⽬标⽅法进⾏调⽤。
+
+
+
+---
+
+
 
 # 8. Lambda 表达式与字节码的关系
 
@@ -1913,6 +1938,8 @@ public static void foo();
 - 14：istore_0 将栈顶元素出栈赋值给局部变量表 slot = 0 的变量，也就是 i。在这时，局部变量 i 又被赋值为 0 了，前⾯的 iinc 指令对 i 的加⼀操作前功尽弃。
 
 <img src="pic/JVM字节码从入门到精通/image-20211115221943471.png" alt="image-20211115221943471" style="zoom:45%;" />
+
+<img src="pic/JVM字节码从入门到精通/image-20211130163600870.png" alt="image-20211130163600870" style="zoom:50%;" />
 
 如果要⽤伪代码来理解i = i++ ，应该是下⾯这样的
 
@@ -2243,8 +2270,13 @@ public int testSameHash_translate(String name) {
 最后，给你留两道思考题
 
 1. Java 的 hashCode 冲突的概率其实是很⼤的，其底层原因是什么？
-
 2. 你可以随意构造两个 hashCode 相同的字符串吗？它们有什么规律
+
+
+
+---
+
+
 
 # 11. try-catch-finally 
 
@@ -2444,6 +2476,12 @@ public static void main(String[] args) {
 
 2、低版本的 JDK 采⽤ jsr/ret 来实现 finally 语句块，你可以去了解⼀下这两个指令的作⽤，实现⼀下 finally 语义吗？
 
+
+
+---
+
+
+
 # 12. try-with-resource
 
 <img src="pic/JVM字节码从入门到精通/image-20211116120554956.png" alt="image-20211116120554956" style="zoom:50%;" />
@@ -2608,7 +2646,285 @@ Exception table:
 
 留⼀个作业：我们没有逐⾏解析 0x02 中的字节码，你能逐⾏分析⼀下每条字节码的含义吗？
 
+
+
+---
+
+
+
 # 13. Kotlin
+
+Kotlin 是一门让人觉得惊喜的语言，2017 年 Google I/O 大会上，Google 宣布将 Kotlin 作为 Android 开发的头等语言以后，Kotlin 得到了大量的关注和快速的发展，我们后端开发也在此时进行了第一时间 的跟进。
+
+Kotlin 代码更加简洁、类型推断、不变性、null 安全、函数式编程、协程等特性，都非常好用，而且能够与 Java 无缝互相调用，迁移成本几乎为零。与其说 Kotlin 是一门新语言，不如说是 Java 上最流行的库。这些好用语法层面的特性的背后都是华丽的语法糖，写 Kotlin 很爽是因为编译器把那些繁琐的东西帮我们都做了。
+
+哪有什么岁月静好，不过是有人替你负重前行，
+
+## 0x01 main 是怎么回事
+
+在 Java 中，main 函数必须要写在一个 class 里面，但是 Kotlin 中却不用这样，比如我们新建了一个 MyTestMain.kt 文件，写入一个 main 函数
+
+```kotlin
+fun main(args: Array<String>) { 
+  println("hello kotlin")
+}
+```
+
+用 kotlinc 编译一下，会发现生成一个类文件 MyTestMainKt.class
+
+```shell
+public final class MyTestMainKt {
+	public static final void main(java.lang.String[]);
+		Code:
+			1: ldc 						#9 		// String args
+  		3: invokestatic 	#15 	// Method kotlin/jvm/internal/Intrinsics.checkParameterIsNotNull:(Ljava/lang/Object;Ljava/lang/String;)V 
+  		6: ldc 						#17		// String hello kotlin
+  		8: astore_1
+			9: getstatic 			#23		// Field java/lang/System.out:Ljava/io/PrintStream;
+			12: aload_1
+			13: invokevirtual #29		// Method java/io/PrintStream.println:(Ljava/lang/Object;)V
+			16: return
+```
+
+人肉翻译一下
+
+```kotlin
+public final class MyTestMainKt {
+	public static final void main(String[] args) {
+		Intrinsics.checkParameterIsNotNull(args, "args");
+    String str = "hello kotlin";
+    System.out.println(str);
+	} 
+}
+```
+
+在 Kotlin1.3 版本中，我们甚至可以省略掉 main 函数的参数，更加简洁
+
+```kotlin
+fun main() {
+	println("hello kotlin")
+}
+```
+
+## 0x02 object 易如反掌创建单例
+
+在准备面试的过程中，你一定准备过单例模式的 N 中写法，比如饿汉式、懒汉式、单线程写法、双重检查锁写法、枚举
+
+下面这种就是最简单的一种 eager 模式单例
+
+```kotlin
+public class SingleObject {
+	private static SingleObject instance = new SingleObject(); 
+  private SingleObject() {}
+
+	public static SingleObject getInstance(){
+		return instance; 
+  }
+}
+```
+
+object 关键字天生为单例而生，只用如下简单的做法就可以实现了上面代码 饿汉式单例模式同样的功能 
+
+```kotlin
+object MySingleton {
+
+}
+```
+
+它是如何做到的呢? 用 kotlinc 把上面的源码编译成字节码kotlinc MySingleton.kt
+
+```shell
+static {};
+	0: new 					 #2  // class MySingleton 
+	3: dup
+	4: invokespecial #25 // Method "<init>":()V
+	7: astore_0
+	8: aload_0
+	9: putstatic 		 #27 // Field INSTANCE:LMySingleton;
+	12: return 
+```
+
+
+
+- 0 ~ 7:是我们前面介绍对象初始化操作里面非常经典的操作，new-dup-invokespecial-astore，看到这个现在就要形成条件反射，这就是新建一个对象存储到局部变量表的过程。可以理解为对应 Java 中代码MySingleton localMySingleton = new MySingleton()
+- 8 ~ 9:是把刚刚新建的变量从局部变量表中捞出来存储到类的静态变量 INSTANCE 中
+
+人肉翻译成 Java 代码就是
+
+```kotlin
+public final class MySingleton {
+	public static final MySingleton INSTANCE; 
+  	static {
+			MySingleton localMySingleton = new MySingleton();
+			INSTANCE = localMySingleton; 
+    }
+}
+```
+
+
+
+## 0x03 扩展方法
+
+Kotlin 的扩展方法比 Java 要灵活多了， ExtensionTest.kt
+
+```kotlin
+class MyClass(val i: Int)
+fun MyClass.plusOne() = this.i + 1 
+fun main(args: Array<String>) {
+	val obj = MyClass(1)
+	println(obj.plusOne()) 
+}
+```
+
+那 Kotlin 编译器会怎么实现这样一个特性呢?先来看下 MyClass类有没有做修改,使用 javap MyClass.class 会发现 MyClass 并没有发现 plusOne 函数的踪迹，这也比较符合常理，因为扩展方法往往是后期动 态新增的，直接修改 MyClass 类不太合适，剩下的一个类就是 ExtensionTestKt 了，查看一下字节码
+
+```shell
+public static final int plusOne(MyClass); 
+	Code:
+		0: aload_0
+		1: ldc 					#9  // String receiver$0
+		3: invokestatic #15 // Method kotlin/jvm/internal/Intrinsics.checkParameterIsNotNull:(Ljava/lang/Object;Ljava/lang/String;)V
+		6: aload_0
+		7: invokevirtual #21 // Method MyClass.getI:()I
+		10: iconst_1
+		11: iadd
+		12: ireturn
+```
+
+可以看到 ExtensionTestKt 新增了一个 plusOne 函数，函数参数是 MyClass 对象，上面的字节码非常简单，人肉翻译机翻译一下是这样
+
+```kotlin
+public static final int plusOne(MyClass $receiver) {
+  Intrinsics.checkParameterIsNotNull($receiver, "receiver$0"); 
+  return $receiver.getI() + 1;
+}
+```
+
+main 调用翻译成 Java 代码
+
+```
+MyClass obj = new MyClass(1);
+int i = ExtensionTestKt.plusOne(obj); 
+System.out.println(i);
+```
+
+所以 Kotlin 就是扩展函数代码所在的类新建了一个静态的函数，把要扩展的类作为静态函数的第一个参数传入进来，简化而言就是这样:func obj.extension -> OtherClass.extension(obj) Kotlin 就是用这样一 种非常简单轻量的方式实现了函数扩展。
+
+## 0x04 高级 for 循环
+
+```kotlin
+for (i in 100 downTo 1 step 2) {
+	println(i)
+}
+```
+
+输出:
+
+> 100 98 ... 2
+
+对应字节码
+
+```shell
+public static final void foo(); 
+	Code:
+		0: bipush         100
+		2: iconst_1
+		3: invokestatic   #57 // Method kotlin/ranges/RangesKt.downTo:(II)Lkotlin/ranges/IntProgression;
+		6: iconst_2
+		7: invokestatic   #61 // Method kotlin/ranges/RangesKt.step:(Lkotlin/ranges/IntProgression;I)Lkotlin/ranges/IntProgression;
+		
+		10: dup
+		11: dup
+		12: invokevirtual #67 // Method kotlin/ranges/IntProgression.getFirst:()I 
+		15: istore_0
+		16: invokevirtual #70 // Method kotlin/ranges/IntProgression.getLast:()I 
+		19: istore_1
+		20: invokevirtual #73 // Method kotlin/ranges/IntProgression.getStep:()I
+		23: istore_2
+		
+		24: iload_0
+		25: iload_1
+		26: iload_2
+		27: ifle          36
+		30: if_icmpgt     58 
+		33: goto          39 
+		36: if_icmplt     58
+		
+		39: getstatic     #39 // Field java/lang/System.out:Ljava/io/PrintStream;
+		42: iload_0
+		43: invokevirtual #76  // Method java/io/PrintStream.println:(I)V
+		46: iload_0
+		47: iload_1
+		48: if_icmpeq      58
+		51: iload_0
+		52: iload_2
+		53: iadd
+		54: istore_0
+		55: goto 39
+		58: return
+```
+
+我们把局部变量表放出来，你能否通过上面的字节码人肉翻译出 Java 代码呢?
+
+<img src="pic/JVM字节码从入门到精通/image-20220204161424281.png" alt="image-20220204161424281" style="zoom:50%;" />
+
+我们逐行翻译一下
+
+- 0 ~ 7:调用了 kotlin 标准库的两个函数，翻译一下大概如下 IntProgression progression = RangesKt.step(RangesKt.downTo(100, 1), 2); 这里要注意，last 的初始化值为 2(不是我们代码中的1)，不是我写错了，是 Kotlin 根据 first last step 初始值算出来的最终迭代退出的值，后面会有用
+- 10 ~ 23:初始化一些变量为后面循环做准备，这里有三个变量分别是循环开始值(记为 first)、循环结束值(记为 last)、循环 step(记为 step) 24 ~ 30:做一些明显不符合条件的跳出。比如 step 大于 0 的情况下，first 应该小于等于 last，step 小于等于 0 的情况下，fist 应该大于等于 last
+
+- 24 ~ 26:加载三个变量到操作数栈上
+
+<img src="pic/JVM字节码从入门到精通/image-20220204161820909.png" alt="image-20220204161820909" style="zoom:50%;" />
+
+- 27 行:ifle 指令表示小于等于 0 则跳转 36 行，这里是判断 step 小于等于 0 的情况下，继续进行 first 和 last 的比较。执行完，操作数栈如下
+
+<img src="pic/JVM字节码从入门到精通/image-20220204161932465.png" alt="image-20220204161932465" style="zoom:50%;" />
+
+- 30 行与 36 行使用 if_icmpgt 和 if_icmplt 对栈顶的两个变量进行比较(也即first 和 last)，如果不合法直接跳出
+
+- 39 ~ 55:while 循环处理。39 ~ 43 打印 first 的值，然后对局部变量表 0 和 1 位置的变量进行比较是否相等，这里是进行 first 和 last 是否相等的判断，如果相等，则退出循环。如果不等，对 first +=
+
+  step 操作
+
+人肉字节码翻译机的结果如下:
+
+```kotlin
+public static void foo() {
+	IntProgression progression = RangesKt.step(RangesKt.downTo(100, 1), 2); 
+  int first = progression.getFirst(); // first: 100
+	int last = progression.getLast(); 	// last : 2
+  int step = progression.getStep(); 	// step : -2
+  if (step > 0) {
+		if (first > last) { 
+      return;
+		}
+	} else if (first < last) {
+		return;
+  }
+	while (true) { 
+    System.out.println(first); 
+    if (first == last) {
+			return; 
+    }
+		first += step; 
+  }
+}
+```
+
+在 while 循环中，注意循环退出的条件是判断 first 是否与 last 相等，而不是 first 是否小于 last，就是因为在 IntProgression 初始化的时候就已经做好了 last 的计算，可以用效率更高的等于在循环中进行比 较判断。
+
+## 0x05 小结
+
+这篇文章我们讲了 Kotlin 语法糖在字节码层面的实现细节，一起来回顾一下要点:第一，没有被任何类包裹的 main 函数在编译后自动生成一个临时类包含了上面的静态 main 函数。第二，object 对象即 单例的写法实际上是一个 eager 模式的单例实现。第三，Kotlin 扩展方法实际上是生成了一个静态方法，把对象作为静态方法的参数传入，调用扩展方法实际上是调用了另外一个类的静态方法。第四，我 们讲了一下 Kotlin 高级 for 循环的例子，其底层是可以理解为是用 while 语句来实现。
+
+## 0x06 思考
+
+留一个作业:Kotlin 声明函数时可以指定默认参数值，这样可以避免创建重载的函数，你可以从字节码的角度分析一下具体的实现吗?
+
+
+
+---
 
 
 
@@ -2737,6 +3053,12 @@ JVM 不会使⽤特殊的字节码来调⽤同步⽅法，当 JVM 解析⽅法�
 
 欢迎你在留⾔区留⾔，和我⼀起讨论。
 
+
+
+---
+
+
+
 # 15. java泛型
 
 <img src="pic/JVM字节码从入门到精通/image-20211116153403987.png" alt="image-20211116153403987" style="zoom:50%;" />
@@ -2767,7 +3089,7 @@ Code:
 
 ## 0x02 泛型的核⼼概念：类型擦除（type erasure）
 
-理解泛型概念的最重要的是理解类型擦除。Java 的泛型是在 javac 编译期这个级别实现的。在⽣成的字节码中，已经不包含类型信息了。这种在泛型使⽤时加上类型参数，在编译时被抹掉的过程被称为泛 型擦除。 
+理解泛型概念的最重要的是理解类型擦除。Java 的泛型是在 javac 编译期这个级别实现的。在⽣成的字节码中，已经不包含类型信息了。这种在泛型使⽤时加上类型参数，在编译时被抹掉的过程被称为泛型擦除。 
 
 ⽐如在代码中定义：List<String> 与 List<Integer> 在编译以后都变成了 List。JVM 看到的只是 List，⽽ JVM 不允许相同签名的函数在⼀个类中同时存在，所以上⾯代码中编译⽆法通过。 
 
@@ -2791,11 +3113,14 @@ public void print(java.util.List<java.lang.String>);
 			Signature: #18 					// (Ljava/util/List<Ljava/lang/String;>;)V
 ```
 
-LocalVariableTypeTable 和 Signature 是针对泛型引⼊的新的属性，⽤来解决泛型的参数类型识别问题，Signature 最为重要，它的作⽤是存储⼀个⽅法在字节码层⾯的特征签名，这个属性保存的不是原⽣ 类型，⽽是包括了参数化类型的信息。我们依然可以通过反射的⽅式拿到参数的类型。所谓的擦除，只是把⽅法 code 属性的字节码进⾏擦除。 
+LocalVariableTypeTable 和 Signature 是针对泛型引⼊的新的属性，⽤来解决泛型的参数类型识别问题，Signature 最为重要，它的作⽤是存储⼀个⽅法在字节码层⾯的特征签名，这个属性保存的不是原⽣类型，⽽是包括了参数化类型的信息。我们依然可以通过反射的⽅式拿到参数的类型。所谓的擦除，只是把⽅法 code 属性的字节码进⾏擦除。 
 
 ## 0x04 ⼩结
 
-这篇⽂章我们讲解了字节码在 Java 泛型上的应⽤，⼀起来回顾⼀下要点：第⼀，由于类型擦除的存在，List<String>.class、List<Integer>.class在 JVM 层⾯只有 List.class，因此泛型在重载上有⼀些 问题。第⼆，通过 javap 可以看到泛型的类型擦除并不是完全擦除了，字节码中 Signature 域存储了⽅法带有泛型的签名。
+这篇⽂章我们讲解了字节码在 Java 泛型上的应⽤，⼀起来回顾⼀下要点：
+
+- 第⼀，由于类型擦除的存在，List<String>.class、List<Integer>.class在 JVM 层⾯只有 List.class，因此泛型在重载上有⼀些问题。
+- 第⼆，通过 javap 可以看到泛型的类型擦除并不是完全擦除了，字节码中 Signature 域存储了⽅法带有泛型的签名。
 
 ## 0x05 思考
 
@@ -2805,7 +3130,7 @@ LocalVariableTypeTable 和 Signature 是针对泛型引⼊的新的属性，⽤�
 public void inspect(List<Object> list) { } 
 public void test() {
 	List<String> strs = new ArrayList<String>();
-	inspect(strs); // 编译错误 
+	inspect(strs); // 编译错误，不兼容类型
 }
 ```
 
@@ -2852,11 +3177,12 @@ Method.invoke 源码如下：
 
 <img src="pic/JVM字节码从入门到精通/image-20211116154152989.png" alt="image-20211116154152989" style="zoom:50%;" />
 
-可以最终调⽤了MethodAccessor.invoke⽅法，MethodAccessor 是⼀个接⼜
+可以最终调⽤了MethodAccessor.invoke⽅法，MethodAccessor 是⼀个接口
 
 ```java
 public interface MethodAccessor { 
-  public Object invoke(Object obj, Object[] args) throws IllegalArgumentException, InvocationTargetException; 
+  public Object invoke(Object obj, Object[] args) 
+    throws IllegalArgumentException, InvocationTargetException; 
 }
 ```
 
@@ -2865,8 +3191,9 @@ public interface MethodAccessor {
 ```java
 class DelegatingMethodAccessorImpl extends MethodAccessorImpl {
 	private MethodAccessorImpl delegate; 
-  public Object invoke(Object obj, Object[] args) throws IllegalArgumentException, InvocationTargetException {
-	return delegate.invoke(obj, args); 
+  public Object invoke(Object obj, Object[] args) 
+    throws IllegalArgumentException, InvocationTargetException {
+		return delegate.invoke(obj, args); 
   }
 ```
 
@@ -2889,7 +3216,6 @@ private static native Object invoke0(Method m, Object obj, Object[] args);
 > ./hotspot/src/share/vm/prims/jvm.cpp JVM_ENTRY(jobject, JVM_InvokeMethod(JNIEnv *env, jobject method, jobject obj, jobjectArray args0))
 >
 > ./hotspot/src/share/vm/runtime/reflection.cpp oop Reflection::invoke_method(oop method_mirror, Handle receiver, objArrayHandle args, TRAPS)
->
 
 这⾥不详细展开 native 实现的细节。
 
@@ -2912,7 +3238,8 @@ private static native Object invoke0(Method m, Object obj, Object[] args);
 ```java
 public class GeneratedMethodAccessor1 extends MethodAccessorImpl { 
   @Override 
-  public Object invoke(Object obj, Object[] args) throws IllegalArgumentException, InvocationTargetException { 
+  public Object invoke(Object obj, Object[] args) 
+    throws IllegalArgumentException, InvocationTargetException { 
     ReflectionTest.foo(); 
     return null; 
   } 
@@ -2965,33 +3292,1228 @@ native 调⽤的⽅式⽐ Java 类直接调⽤的⽅式慢 20 倍，但是第⼀
 
 现实中⼤量使⽤反射调⽤的项⽬，inflation 机制可能造成哪些隐患呢？
 
+- 接口的通用性，java的invoke方法是传object和object[]数组的。基本参数类型需要装箱和拆箱，产生大量额外的对象和内存开销，频繁促发GC。
+- 编译器难以对动态调用的代码提前做优化，比如方法内联。
+- 反射需要按名检索类和方法，有一定的时间开销。
+
 
 
 ---
 
 
 
-# javac 编译原理
+# 17. javac 编译原理
+
+javac 的目标是把 Java 源码编译为符合 Java 虚拟机规范的 class 文件，在 Oracle 的 JDK 中，javac 是用 java 语言写的，在某种意义上算是实现了 java 语言的自举。你完全可以不使用 Oracle 提供的 javac，自己实现一个java 源码编译器，Eclipse 自己就实现了自己的编译器，称为 Eclipse Compiler for Java (ECJ)。
+
+Javac 的源码非常复杂，没有较强的编译原理理论阅读起来会比较吃力，调试源码的方式是一个比较好的方法帮助我们理解里面的实现细节，本章开始我首先会介绍 Javac 源码的调试。
+
+## Javac 源码调试
+
+javac 源码调试的过程是比较简单的，它本身就是一个用 Java 语言写的，对我们理解内部逻辑比较友好。下面的环境是 Intellij 和 JDK8 下完成。
+
+### 1. 下载导入 javac 的源码
+
+> 如果不想从 openjdk 下载折腾，可以跳过第 1 步
+>
+> 直接从我的 github 下载: https://github.com/jelly54/java-code-reading
+>
+> 下载后直接导入 IDEA 即可使用
+
+OpenJDK 的下载方式为: 打开 https://hg.openjdk.java.net/jdk8/jdk8/langtools/ ，点击左侧的 zip 或者 gz 进行下载。
+
+在 Intellij 中新建一个 javac-source-code-reading 项目，把源码目录的 src/share/classes/com 目录整个拷贝到项目 src 目录下，删掉没用的 javadoc 目录。 
+
+### 2. 找到 javac 主函数入口
+
+代码在src/com/sun/tools/javac/Main.java
+
+<img src="pic/JVM字节码从入门到精通/image-20220204172907836.png" alt="image-20220204172907836" style="zoom:50%;" />
+
+运行这个 main 函数，因为没有加需要编译的源代码路径，不出意外应该会在控制台会输出下面的内容
+
+<img src="pic/JVM字节码从入门到精通/image-20220204171349724.png" alt="image-20220204171349724" style="zoom:50%;" />
+
+新建一个HelloWorld.java文件，内容随缘，在启动配置的Program arguments里加入 HelloWorld.java 的绝对路径
+
+<img src="pic/JVM字节码从入门到精通/image-20220204180152616.png" alt="image-20220204180152616" style="zoom:50%;" />
+
+再次运行 Main.java，会在 HelloWorld.java 的同级目录生成 HelloWorld.class 文件。
+
+### 3.调涨源码级别
+
+Intellij 中显示的是反编译 tools.jar 得到的源码，可读性没有源码那么好。
+
+打开 Project Structure 页面(File->Project Structure)， 选中图中 Dependencies 选项卡，把 <Moudle source> 顺序调整到项目 JDK 的上面:
+
+<img src="pic/JVM字节码从入门到精通/image-20220204180550178.png" alt="image-20220204180550178" style="zoom:50%;" />
+
+### 3. 加断点
+
+在 Main.java 中打上断点，开始调试。
+
+## Javac 的七个阶段
+
+javac 整个流程分为七个大的阶段:
+
+1. parse: 解析阶段的主要读取.java 源文件做词法分析(LEXER)和语法分析(PARSER) 
+2. enter: 生成符号表
+
+3. process:处理注解
+
+4. attr: 检查语义合法性、常量折叠
+
+5. flow: 数据流分析
+6. desugar: 去除语法糖 
+7. generate: 生成字节码
+
+### 解析(parse)
+
+解析阶段的主要读取 .java 源文件做词法分析(LEXER)和语法分析(PARSER)。
+
+**词法分析**
+
+词法分析可以算是编译器的一项工作，就比如英语句子 "you are handsome" 在我们大脑中会被拆分为 "you" + "are" + "handsome" 一样，词法分析将源代码转换为一个个词法记号(Token)。
+
+javac 中的词法分析由 com.sun.tools.javac.parser.Scanner 实现，以语句 int k = i + j; 为例，引入 Scanner 类的源码做实际的测试:
+
+```java
+import com.sun.tools.javac.parser.Scanner;
+import com.sun.tools.javac.parser.ScannerFactory; 
+import com.sun.tools.javac.util.Context;
+
+public class MyTest {
+	public static void main(String[] args) {
+    ScannerFactory factory = ScannerFactory.instance(new Context());
+		Scanner scanner = factory.newScanner("int k = i + j;", false);
+	
+		scanner.nextToken(); 
+		System.out.println(scanner.token().kind);   // int
+		scanner.nextToken(); 		
+		System.out.println(scanner.token().name()); // j
+		scanner.nextToken(); 		
+		System.out.println(scanner.token().kind);   //=
+		scanner.nextToken(); 
+		System.out.println(scanner.token().name()); // i
+		scanner.nextToken(); 
+		System.out.println(scanner.token().kind);   //+
+		scanner.nextToken(); 		
+		System.out.println(scanner.token().name()); // j
+		scanner.nextToken(); 
+		System.out.println(scanner.token().kind);    //;
+  }
+}
+```
+
+这个过程如下图所示:
+
+图没了……
 
 
 
-# Java Instrumentation 包
+**语法分析**
+
+紧随词法分析之后的是语法分析。语法分析是在词法分析的基础上，生成抽象语法树(AST)，语句 int k = i + j; 对应的 AST 如下:
+
+图没了……
 
 
 
-# ASM
+生成 AST 的作用是方便计算机进行进一步的处理，比如通过遍历可以得到结点的值。
+
+### 生成符号表(enter)
+
+enter 阶段的主要作用是填充符号表(symbol table)。符号表是由标识符与标识符相关信息构成的记录表，标识符相关的信息包括它们的类型、作用域等。在处理变量、方法定义时，会讲它们的信息存储 到符号表中，方便后续用的时候进行快速的查询。
+
+比如下面的 Java 代码:
+
+```java
+public class HelloWorld { // 定义类 HelloWorld
+	intx=5;       // 定义 int 型字段 x，初始化值为 5
+	char y = 'A'; // 定义 char 型字段 y，初始化值为 'A'
+
+	// 定义 add 方法，返回类型为 long，参数个数为 2，类型都为 long 
+  public long add(long a, long b) {
+		return a + b; 
+  }
+}
+```
+
+在 javac 中，使用 Symbol 类来表示符号，每个符号都包含名称、类别和类型这三个关键属性:
+
+- name:符号名，比如上面代码中的 "x"，"y"，"add" 都是符号名
+- kind:符号类型，上面代码代码中 x 的符号类型是 Kinds.VAR 表示这是一个变量符号，add 的符号类型是 Kinds.MTH，表示这个是一个方法符号 
+- type:符号类型，上面代码中 x 的符号类型是 int，y 的符号类型为 char，add 方法的符号类型为 null，对于 Java 这种静态类型的语义来说，在编译期就会确定了变量的类型
+
+Javac 中 Symbol 类是一个抽象类，常见的实现类如下图:
+
+图没了……
 
 
 
-# CGLIB
+接下来我们来介绍作用域(Scope)，由 com.sun.tools.javac.code.Scope 类表示。作用域是指类、变量、方法等的有效范围。以下面的代码为例:
+
+```java
+public void foo() {
+	intx=0;//x 在 foo 方法作用域内 
+  System.out.println(x);
+}
+
+public void bar() {
+	intx=0;//x 在 bar 方法作用域内 
+  System.out.println(x);
+}
+```
+
+foo 和 bar 函数都定义了一个名为 "x" 的 int 类型的变量，这两个变量能独立使用不会互相影响，在超出各自的方法体作用域以后就对外不可见了，外部也访问不到。 作用域也可以进行嵌套:
+
+```java
+public class MyClass {
+	int x = 0;
+  public void foo() {
+    int i = 0; // foo 方法作用域
+    {
+        int y = 0; // 第一层嵌套作用域
+        {
+            int z = 0; // 第二层嵌套作用域
+        }
+    }
+    int j = 0; // foo 方法作用域    
+	} 
+}
+```
+
+如下图所示:
+
+图没了……
 
 
 
-# CRACK
+接下来很关键的一步是符号表的查找，符号表查找的方式是先在当前作用域下查找，如果找到就直接返回，如果在当前作用域没有找到，那么它会向上在外层的作用域继续查找，直到找到或者到达顶层 作用域为止。
+
+Enter 阶段除了上述生成符号表，还会在类文件中没有默认构造方法的情况下，添加 <init> 构造方法 
+
+### 处理注解(process)
+
+process 用来做注解的处理，这个步骤是 com.sun.tools.javac.processing.JavacProcessingEnvironment 类完成，从 JDK6 开始 javac 支持在编译阶段允许用户自定义处理注解，大名鼎鼎的 lombok 框架就是利用 了这个特性来通过注解进行了预处理生成目标 class 文件，比在运行时用反射来处理性能明显提升。
+
+### 检查合法性(Attr)
+
+Attr 主要由 com.sun.tools.javac.comp.Attr 类实现，这个阶段会做语义合法性检查和进行逻辑判断等: 
+
+1. 会检查是否有冲突的类定义，同一个类中是否存在相同签名的方法， 
+2. 检查访问权限是否符合语义，比如 private 方法的访问是否是在方法所在类中访问等。
+3. 方法重载的情况下解析出最符合(Most Specific)的方法，比如下面的例子
+
+```java
+public static void method(Object obj){ }
+
+public static void method(String obj){ }
+```
+
+调用 method(null); 会最终调用第二个方法，这个过程在编译期间就已经确定，方法的选择是在 Resolve 类的 mostSpecific 方法中完成。
+
+4. 折叠常量:常量字符串相加，常量整数运算等，比如下面的代码:
+
+```java
+public void foo() { 
+  int x = 1 + 2;
+	String y = "hel" + "lo";
+	int z = 100 / 2; 
+}
+
+// 在 Attr 阶段后会合并为下面这样:
+
+public void foo() { 
+  int x = 3;
+	String y = "hello";
+	int z = 50; 
+}
+```
+
+### 数据流分析(flow)
+
+flow 阶段是数据流分析阶段，主要由 com.sun.tools.javac.comp.Flow 类实现，下面列举几个常见的场景: 
+
+1. 检查非 void 方法是否所有的退出分支都有返回值
+
+```java
+public boolean foo(int x) { 
+  if (x == 0) {
+		return true;
+	}
+	// 注释掉这个 return 
+  // return false;
+}
+
+编译报错:
+error: missing return statement 
+```
+
+2. 检查受检异常(checked exception)是否被被捕获或者显式抛出
+
+```java
+public void foo() {
+	throw new FileNotFoundException();
+}
+
+编译报错:
+error: unreported exception FileNotFoundException; must be caught or declared to be thrown throw new FileNotFoundException();
+```
+
+3. 局部变量使用前未初始化
+
+Java 中的成员变量在为赋值的情况下会赋值为默认值，但是局部变量不会，在使用前必须先赋值，比如下面的代码:
+
+```java
+public void foo() { 
+  int x;
+	int y = x + 1;
+	System.out.println(y); 
+}
+
+编译报错:
+error: variable x might not have been initialized int y = x + 1;
+```
+
+4. 检查 final 变量是否有重复赋值，保证 final 的语义
+
+```java
+public void foo(final int x) { 
+  x = 2;
+	System.out.println(x); 
+}
+
+编译报错:
+error: final parameter x may not be assigned x = 2;
+```
+
+5. 是否有语句不可达，比如在 return 之后的语句 
+
+```java
+public int foo() {
+  System.out.println("Hello"); 
+  return 1; 
+  System.out.println("World");
+}
+
+编译报错:
+error: unreachable statement System.out.println("World");
+```
+
+这个逻辑判断是在 Flow.java 的 AliveAnalyzer 中完成的，在碰到 return 以后，会回调 markDead 方法，把 alive 变量设置为 false，表示后面的代码块将不可达
+
+```java
+void markDead(JCTree tree) { 
+  alive = false;
+}
+```
+
+继续往下处理第二个 println 时，回调 AliveAnalyzer 的 scanStat 方法，这里会判定当前语句是否已经不可达，如果不可达输出错误日志
+
+```java
+void scanStat(JCTree tree) {
+	// 如果已经不可达，tree 代表第二次 println 语句，不为 null 
+  if (!alive && tree != null) {
+		// 打印 "error: unreachable statement" 
+    log.error(tree.pos(), "unreachable.stmt"); 
+    if (!tree.hasTag(SKIP)) alive = true;
+	}
+	scan(tree); 
+}
+```
+
+### 去除语法糖(desugar)
+
+Java 中的语法糖没有 Kotlin 和 Scala 那么花里胡哨，每次随着新版本的发布也是有非常多的语法糖在不停的加入进来。比如下面这些都算是语法糖:
+
+- 泛型
+- 内部类
+- try-with-resources
+- foreach 语句 
+- 原始类型和对象之间的隐式转换 
+- 字符串和枚举的 switch-case 实现 
+- 后缀和前缀运算符(i++ 和 ++i) 
+- 变长参数
+
+desugar 的过程就是解除语法糖，主要由 com.sun.tools.javac.comp.TransTypes 类和com.sun.tools.javac.comp.Lower 类中完成。TransTypes 类用来擦除泛型和插入相应的类型转换代码，Lower 类用来处理除泛 型以外其它的语法糖。以下面的代码为例，
+
+```java
+public void foo() {
+	List<Long> idList = new ArrayList<>(); 
+  idList.add(1L);
+	long firstId = idList.get(0);
+}
+```
+
+对应的字节码如下:
+
+```shell
+// 执行 new ArrayList<>() 
+0: new 						#2 // class java/util/ArrayList
+3: dup
+4: invokespecial  #3 // Method java/util/ArrayList."<init>":()V
+7: astore_1
+8: aload_1
+// 把原始类型 1 自动装箱为 Long 类型 
+9: lconst_1
+10: invokestatic  #4 // Method java/lang/Long.valueOf:(J)Ljava/lang/Long;
+// 执行 add 调用
+13: invokeinterface #5, 2 // InterfaceMethod java/util/List.add:(Ljava/lang/Object;)Z
+18: pop
+19: aload_1
+// 执行 get(0) 调用
+20: iconst_0
+21: invokeinterface  #6, 2 // InterfaceMethod java/util/List.get:(I)Ljava/lang/Object;
+// 检查 Object 对象是否是 Long 类型 
+26: checkcast				 #7    // class java/lang/Long
+// 自动拆箱为原始类型
+29: invokevirtual 	 #8    // Method java/lang/Long.longValue:()J
+32: lstore_2
+33: return
+```
+
+把上面的代码转换为相应的 Java 代码应该是:
+
+```java
+public void foo() {
+	List idList = new ArrayList();
+	// 原始类型自动装箱
+	idList.add(Long.valueOf(1L));
+	// 插入强制类型转换，保持泛型语义，自动拆箱转为原始类型 
+  long firstId = ((Long) idList.get(0)).longValue();
+}
+```
+
+接了下来我们来看枚举类的 switch-case 是如何实现的。
+
+```java
+Color color = Color.BLUE; 
+switch (color) {
+	case RED: 
+    System.out.println("red"); 
+    break;
+	case BLUE: 
+    System.out.println("blue"); 
+    break;
+	default: 
+    System.out.println("default"); 
+    break;
+}
+```
+
+会转为如下的实现形式:
+
+```java
+class Outer$0 {
+	synthetic static final int[] $SwitchMap$Color = new int[Color.values().length];
+	
+  static { 
+    try {
+			$SwitchMap$Color[Color.RED.ordinal()] = 1; 
+    } catch (NoSuchFieldError ex) {
+		}
+		try {
+			$SwitchMap$Color[Color.BLUE.ordinal()] = 2; 
+    } catch (NoSuchFieldError ex) {
+		}
+  } 
+}
+
+public void bar(Color color) {
+	switch (Outer$0.$SwitchMap$Color[color.ordinal()]) {
+		case 1: 
+      System.out.println("red"); 
+      break;
+		case 2: 
+      System.out.println("blue"); 
+      break;
+		default: 
+      System.out.println("default"); 
+      break;
+	} 
+}
+```
+
+javac 为枚举的每一个 switch 都会生成了一个中间类，这个类包含了一个称之为 "SwitchMap" 的数组，SwitchMap 数组做了 case 值中枚举 ordinal 和一个递增整数序列的映射。
+
+为什么不在直接用 ordinal 值来做 case 值呢?一个理由可能的理由是为了更好性能，case 值中的 ordinal 不一定是连续的，通过 SwitchMap 数组可以把不连续的 ordinal 值转为连续的 case 值，编译成更高效的 tableswitch 指令。
+
+### 生成字节码(generate)
+
+generate 阶段主要作用是生成最终的 Class文件，由 com.sun.tools.javac.jvm.Gen 类完成。 下面我列举几个常见的场景:
+
+初始化块代码收集到 <init> 和 <clinit> 中 比如下面的代码:
+
+```java
+public class MyInit { 
+	{
+		System.out.println("hello"); 
+  }
+  public int a = 100; 
+}
+```
+
+编译器会生成如下的 <init> 方法:
+
+```java
+public int a;
+public String b; 
+public void <init>() {
+  // 调用父类 Object 的 <init>() 方法
+  super.<init>();
+  System.out.println("hello");
+  a = 100;
+	b = "hello"; 
+}
+```
+
+javac 会在 generate 阶段将类非静态初始化代码块统一整理到 <init> 方法中，并先调用父类的实例构造器方法。 static 修饰的静态初始化的逻辑一样，会将静态初始化块和静态变量初始化放到 <clinit> 方法中。
+
+把字符串相加"+" 转换为 String 转为 StringBuilder.append
+
+比如下面的字符串 x 和 y 相加代码:
+
+```java
+public void foo(String x, String y) { 
+  String ret = x + y; 
+  System.out.println(ret);
+}
+```
+
+在 generate 阶段会被转换为:
+
+```java
+public void foo(String x, String y) {
+	String ret = new StringBuilder().append(s).append(s2).toString(); 		
+  System.out.println(ret);
+}
+```
+
+switch-case 实现中 tableswitch 和 lookupswitch 指令的选择
+
+前面的几章介绍过，switch-case 根据 case 值的稀疏程度会选择对应的 tableswitch 或者 lookupswitch 指令来实现。这个过程也是在generate 阶段来做的，具体的代码在 Gen.java 的 visitSwitch 方法中，核心
+
+的代码逻辑如下:
+
+那“稀疏”与否是如何确定的呢?比如下面代码:
+
+```java
+public static void foo() { 
+  int a = 0;
+	switch (a) { 
+    case 0:
+			System.out.println("#0");
+			break; 
+    case 1:
+			System.out.println("#1");
+			break; 
+    default:
+			System.out.println("default");
+			break;
+  }
+}
+```
+
+对应的字节码如下:
+
+```shell
+public static void foo(); 
+	0: iconst_0
+	1: istore_0
+	2: iload_0
+	3: lookupswitch { // 2 
+					0: 28
+					1: 39 
+		default: 50
+}
+```
+
+可以看到实际上是采用了 lookupswitch 而不是 tableswitch 来实现，难道 case 值 0 和 1 还不够紧凑吗? 经过调试 javac 的源码，lookupswitch 和 tableswitch 指令的选择的逻辑在这里:
+
+```shell
+com/sun/tools/javac/jvm/Gen.java
+
+long table_space_cost = 4 + ((long) hi - lo + 1); // words 
+long table_time_cost = 3; // comparisons
+long lookup_space_cost = 3 + 2 * (long) nlabels;
+long lookup_time_cost = nlabels;
+int opcode = nlabels > 0 &&
+	table_space_cost + 3 * table_time_cost <= lookup_space_cost + 3 * lookup_time_cost ?
+	tableswitch : lookupswitch;
+```
+
+在上面的例子中，nlables 等于 case 值的个数，等于 2，hi 表示 case 值的最大值 1，lo 表示 case 值的最小值 0，因此可以计算出:
+
+```shell
+// table_space_cost 表示 tableswitch 空间代价 table_space_cost = 4 + (1 - 0 + 1) = 6
+// table_time_cost 表示 tableswitch 时间代价，恒等于 3 table_time_cost = 3
+// lookup_space_cost 表示 lookupswitch 的空间代价 lookup_space_cost = 3 + 2 * 2 = 7
+// lookup_time_cost 表示 lookupswitch 的时间代价 lookup_time_cost = 2
+```
+
+tableswitch 和 lookupswitch 的总代价计算公式
+
+代价 = 空间代价 +3* 时间代价
+
+因此在 case 值为 0、1 时，tableswitch 的代价为 6 + 3 * 3 = 15，lookupswitch 代价为 7 + 3 * 2 = 13，lookupswitch 的代价更小，javac 选择了 lookupswitch 作为 switch-case 的实现指令。 如果 case 值变多为 0、1、2 时，nlables 等于 3，hi 等于 2，lo 等于 0，因此可以计算出:
+
+```shell
+table_space_cost = 7
+table_time_cost = 3
+lookup_space_cost = 3 + 2 * 3 = 9
+lookup_time_cost = 3
+table_space_cost + 3 * table_time_cost = 7 + 3 * 3 = 16 
+lookup_space_cost + 3 * lookup_time_cost = 9 + 3 * 3 = 18
+```
+
+这个时候 table_space_cost 的代价更小，选择 tableswitch 作为 switch-case 的实现指令。
+
+回到开始的问题，为什么 case 值为 0、1 时选择 lookupswitch 作为生成的指令。在数量极少的情况下，lookupswitch 和 tableswitch 的差别不大，只是 javac 的代价计算算法最终导致选择了 lookupswitch。
+
+## 小结
+
+到这里 javac 的内容就介绍完了，javac 的源码非常复杂，里面有大量编译原理的实现细节，这个小节只是解开了里面的冰山一角，更多的细节可以通过文章开头的源码调试来做更深入的理解。
+
+# 18. Java Instrumentation 包
+
+<img src="pic/JVM字节码从入门到精通/image-20220204215437983.png" alt="image-20220204215437983" style="zoom:50%;" />
+
+## Java Instrumentation 概述
+
+Java Instrumentation 这个技术看起来非常神秘，很少有书会详细介绍。但是有很多工具是基于 Instrumentation 来实现的:
+
+- APM 产品: pinpoint、skywalking、newrelic、听云的 APM 产品等都基于 Instrumentation 实现 
+- 热部署工具:Intellij idea 的 HotSwap、Jrebel 等
+- Java 诊断工具:Arthas、Btrace 等
+
+由于对字节码修改功能的巨大需求，JDK 从 JDK5 版本开始引入了java.lang.instrument 包。它可以通过 addTransformer 方法设置一个 ClassFileTransformer，可以在这个 ClassFileTransformer 实现类的转 换。
+
+JDK 1.5 支持静态 Instrumentation，基本的思路是在 JVM 启动的时候添加一个代理(javaagent)，每个代理是一个 jar 包，其 MANIFEST.MF 文件里指定了代理类，这个代理类包含一个 premain 方法。 JVM 在类加载时候会先执行代理类的 premain 方法，再执行 Java 程序本身的 main 方法，这就是 premain 名字的来源。在 premain 方法中可以对加载前的 class 文件进行修改。这种机制可以认为是虚拟机 级别的 AOP，无需对原有应用做任何修改，就可以实现类的动态修改和增强。
+
+从 JDK 1.6 开始支持更加强大的动态 Instrument，在JVM 启动后通过 Attach API 远程加载，后面会详细介绍。
+
+这个章节会分为 javaagent 和动态 Attach 两个部分来介绍
+
+## Java Instrumentation 核心方法
+
+Instrumentation 是 java.lang.instrument 包下的一个接又，这个接又的方法提供了注册类文件转换器、获取所有已加载的类等功能，允许我们在对已加载和未加载的类进行修改，实现 AOP、性能监控等 功能。
+
+常用的方法如下:
+
+```java
+/**
+ * 为 Instrumentation 注册一个类文件转换器，可以修改读取、修改类文件字节码
+ */
+void addTransformer(ClassFileTransformer transformer, boolean canRetransform);
+
+/**
+ * 对JVM已经加载的类重新触发类加载 
+ */
+void retransformClasses(Class<?>... classes) throws UnmodifiableClassException;
+
+/**
+ * 获取当前 JVM 加载的所有类对象 
+ */
+Class[] getAllLoadedClasses()
+```
+
+它的 addTransformer 给 Instrumentation 注册一个 transformer，transformer 是 ClassFileTransformer 是一个接又的实例，这个接又就只有一个 transform 方法，调用 addTransformer 设置 transformer 以后，后续 所有 JVM 加载类之前都会被这个 transform 方法拦截，这个方法接收原类文件的字节数组，返回转换过的字节数组，在这个方法中可以做任意的类文件改写。
+
+下面是一个空的 ClassFileTransformer 的实现
+
+```java
+public class MyClassTransformer implements ClassFileTransformer { 
+    @Override
+    public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classBytes) 
+      throws IllegalClassFormatException { 
+        // 在这里读取、转换类文件
+        return classBytes;
+    } 
+}
+```
+
+## Javaagent 介绍
+
+Javaagent 是一个特殊的 jar 包，它并不能单独启动的，而不是必须依附于一个 JVM 进程，可以看作是 JVM 的一个寄生插件，使用 Instrumentation 的 API 用来读取和改写当前 JVM 的类文件。 
+
+### Agent 的两种使用方式
+
+它有两种使用方式:
+
+- 在 JVM 启动的时候加载，通过 javaagent 启动参数 java -javaagent:myagent.jar MyMain，这种方式在程序 main 方法执行之前执行 agent 中的 premain 方法 
+- 在 JVM 启动后 Attach，通过 Attach API 进行加载，这种方式会在 agent 加载以后执行 agentmain 方法
+
+premain 和 agentmain 方法签名如下:
+
+```java
+public static void premain(String agentArgument, Instrumentation instrumentation) throws Exception 
+
+public static void agentmain(String agentArgument, Instrumentation instrumentation) throws Exception
+```
+
+这两个方法都有两个参数
+
+- 第一个 agentArgument 是 agent 的启动参数，可以在 JVM 启动命令行中设置，比如java -javaagent:<jarfile>=appId:agent-demo,agentType:singleJar test.jar的情况下 agentArgument 的值为 "appId:agent-demo,agentType:singleJar"。
+
+- 第二个 instrumentation 是 java.lang.instrument.Instrumentation 的实例，可以通过 addTransformer 方法设置一个 ClassFileTransformer。 第一种 premain 方式的加载时序如下:
+
+<img src="pic/JVM字节码从入门到精通/image-20220204220042792.png" alt="image-20220204220042792" style="zoom:50%;" />
+
+### Agent 打包
+
+为了能够以 javaagent 的方式运行 premain 和 agentmain 方法，我们需要将其打包成 jar 包，并在其中的 MANIFEST.MF 配置文件中，指定 Premain-class 等信息，一个典型的生成好的 MANIFEST.MF 内容 如下
+
+```xml
+Premain-Class: me.geek01.javaagent.AgentMain 
+Agent-Class: me.geek01.javaagent.AgentMain 
+Can-Redefine-Classes: true 
+Can-Retransform-Classes: true
+
+# 下面是一个可以帮助生成上面 MANIFEST.MF 的 maven 配置
+
+<build> 
+  <finalName>my-javaagent</finalName> 
+  <plugins>
+		<plugin> 
+      <groupId>org.apache.maven.plugins</groupId> 
+      <artifactId>maven-jar-plugin</artifactId> 
+      <configuration>
+				<archive> 
+          <manifestEntries>
+						<Agent-Class>me.geek01.javaagent.AgentMain</Agent-Class> 
+            <Premain-Class>me.geek01.javaagent.AgentMain</Premain-Class> 
+            <Can-Redefine-Classes>true</Can-Redefine-Classes> 
+            <Can-Retransform-Classes>true</Can-Retransform-Classes>
+					</manifestEntries> 
+        </archive>
+			</configuration> 
+    </plugin>
+	</plugins> 
+</build>
+```
+
+### Agent 使用方式一: JVM 启动参数
+
+下面使用 javaagent 实现简单的函数调用栈跟踪，以下面的代码为例:
+
+```java
+public class MyTest {
+	public static void main(String[] args) {
+		new MyTest().foo(); 
+  }
+
+	public void foo() { 
+    bar1();
+		bar2(); 
+  }
+	public void bar1() { }
+	public void bar2() { } 
+}
+```
+
+通过 javaagent 启动参数的方式在每个函数进入和结束时都打印一行日志，实现调用过程的追踪的效果。代码见:https://github.com/arthur-zhang/jvm-bytecode-book-example/tree/master/my-trace-agent 核心的方法 instrument 的逻辑如下:
+
+```java
+public static class MyMethodVisitor extends AdviceAdapter {
+	@Override
+	protected void onMethodEnter() {
+		// 在方法开始处插入 <<<enter xxx
+		mv.visitFieldInsn(GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;"); 		mv.visitLdcInsn("<<<enter " + this.getName());
+		mv.visitMethodInsn(INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false); 
+    super.onMethodEnter();
+	}
+
+	@Override
+	protected void onMethodExit(int opcode) {
+		super.onMethodExit(opcode);
+		// 在方法结束处插入 <<<exit xxx
+		mv.visitFieldInsn(GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;"); 		mv.visitLdcInsn(">>>exit " + this.getName());
+		mv.visitMethodInsn(INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+ 	} 
+}
+```
+
+把 agent 打包生成 my-trace-agent.jar，添加 agent 启动 MyTest 类 
+
+> java -javaagent:/path_to/my-trace-agent.jar MyTest 
+
+可以看到输出结果如下:
+
+```
+<<<enter main 
+<<<enter foo 
+<<<enter bar1 
+>>>exit bar1 
+<<<enter bar2 
+>>>exit bar2 
+>>>exit foo 
+>>>exit main
+```
+
+通过上面的方式，我们在不修改 MyTest 类源码的情况下实现了调用链跟踪的效果。更加健壮和完善的调用链跟踪实现会在后面的 APM 章节详细介绍。 
+
+### Agent 使用方式二: Attach API 使用
+
+在 JDK5 中，开发者只能 JVM 启动时指定一个 javaagent 在 premain 中操作字节码，Instrumentation 也仅限于 main 函数执行前，这样的方式存在一定的局限性。从 JDK6 开始引入了动态 Attach Agent 的方 案，除了在命令行中指定 javaagent，现在可以通过 Attach API 远程加载。我们常用的 jstack、arthas 等工具都是通过 Attach 机制实现的。
+
+这个小节会结合跨进程通信中的信号和 Unix 域套接字来看 JVM Attach API 的实现原理，
+
+#### JVM Attach API 基本使用
+
+下面以一个实际的例子来演示动态 Attach API 的使用，代码中有一个 main 方法，每个 3s 输出 foo 方法的返回值 100，接下来动态 Attach 上 MyTestMain 进程，修改 foo 的字节码，让 foo 方法返回 50。
+
+```java
+public class MyTestMain {
+	public static void main(String[] args) throws InterruptedException {
+		while (true) { 
+      System.out.println(foo()); 
+      TimeUnit.SECONDS.sleep(3);
+		} 
+  }
+	public static int foo() { 
+    return 100; // 修改后 return 50;
+  }
+}
+```
+
+步骤如下:
+
+1. 编写 Attach Agent，对 foo 方法做注入，完整的代码见:https://github.com/arthur-zhang/jvm-attach-code/tree/master/my-attach-demo
+
+动态 Attach 的 agent 与通过 JVM 启动 javaagent 参数指定的 agent jar 包的方式有所不同，动态 Attach 的 agent 会执行 agentmain 方法，而不是 premain 方法。
+
+```java
+public class AgentMain {
+	public static void agentmain(String agentArgs, Instrumentation inst) 
+    throws ClassNotFoundException, UnmodifiableClassException {
+
+		System.out.println("agentmain called"); 
+    inst.addTransformer(new MyClassFileTransformer(), true); 
+    Class classes[] = inst.getAllLoadedClasses();
+		for (int i = 0; i < classes.length; i++) {
+			if (classes[i].getName().equals("MyTestMain")) { 
+        System.out.println("Reloading: " + classes[i].getName()); 	
+        inst.retransformClasses(classes[i]);
+				break;
+      } 
+    }
+  }
+}
+```
+
+2. 因为是跨进程通信，Attach 的发起端是一个独立的 java 程序，这个 java 程序会调用 VirtualMachine.attach 方法开始和目标 JVM 进行跨进程通信。
+
+```java
+public class MyAttachMain {
+	public static void main(String[] args) throws Exception {
+		VirtualMachine vm = VirtualMachine.attach(args[0]); 
+    try {
+			vm.loadAgent("/path/to/agent.jar"); 
+    } finally {
+			vm.detach(); 
+    }
+}
+```
+
+使用 jps 查询到 MyTestMain 的进程 id，
+
+> java -cp /path/to/your/tools.jar:. MyAttachMain pid
+
+可以看到 MyTestMain 的输出的 foo 方法已经返回了 50。
+
+```shell
+java -cp . MyTestMain
+
+100
+100
+100
+agentmain called 
+Reloading: MyTestMain 
+50
+50 
+50
+```
+
+#### JVM Attach API 的底层原理
 
 
 
-# APM
+**Unix** **域套接字** ( **Unix Domain Socket** )
+
+
+
+#### JVM Attach 过程分析
+
+## 小结
+
+
+
+---
+
+
+
+# 19. ASM
+
+<img src="pic/JVM字节码从入门到精通/image-20220204223243323.png" alt="image-20220204223243323" style="zoom:50%;" />
+
+码规范的前提下进行字节码改造。如果你写过 class 文件的解析程序，就会发现这个过程极其繁琐，更别说进行增加方法等操作了。
+
+## 0x01 什么是 ASM
+
+ASM 是一个 Java 字节码操控框架。它能被用来动态生成类或者增强既有类的功能。ASM 可以直接产生二进制 class 文件，也可以在类被加载入 Java 虚拟机之前动态改变类行为。 它有以下优点
+
+- 架构设计精巧，使用方便。
+- 更新速度快，支持最新的 Java 版本
+- 速度非常快，在动态代理 class 的生成和 class 的转换时，尽可能确保运行中的应用不会被 ASM 拖慢 
+- 非常可靠、久经考验，已经有很多著名的开源框架都在使用，例如 cglib,、mybatis、fastjson
+
+## 0x02 ASM 核心类介绍
+
+ASM 库是设计模式中访问者模式的典型应用，三大核心类 ClassReader、ClassVisitor、ClassWriter 介绍如下
+
+ClassReader
+
+它是字节码读取和分析引擎，帮我们做了最苦最累的解析二进制的 class 文件字节码的活。采用类似于 SAX 的事件读取机制，每当有事件发生时，触发相应的 ClassVisitor、MethodVisitor 等做相应的处
+
+理。
+
+ClassVisitor
+
+它是一个抽象类，ClassReader 对象创建之后，调用 ClassReader.accept() 方法，传入一个 ClassVisitor 对象。ClassVisitor 在解析字节码的过程中遇到不同的节点时会调用不同的 visit() 方法，比如 visitSource, visitOuterClass, visitAnnotation, visitAttribute, visitInnerClass, visitField, visitMethod 和 visitEnd方法。 在上述 visit 的过程中还会产生一些子过程，比如 visitAnnotation 会触发 AnnotationVisitor 的调 用、visitMethod 会触发 MethodVisitor 的调用。 正是在这些 visit 的过程中，我们得以有机会去修改各个子节点的字节码。 整个过程时序图如下:
+
+<img src="pic/JVM字节码从入门到精通/image-20220204223437618.png" alt="image-20220204223437618" style="zoom: 70%;" />
+
+这个类是 ClassVisitor 抽象类的一个实现类，其之前的每个 ClassVisitor 都可能对原始的字节码做修改，ClassWriter 的 toByteArray 方法则把最终修改的字节码以 byte 数组的形式返回 这三个核心类的关系如下图
+
+<img src="pic/JVM字节码从入门到精通/image-20220204223516743.png" alt="image-20220204223516743" style="zoom:50%;" />
+
+## 0x03 用 ASM 实现简单的调用链跟踪
+
+同样，我们来看一个最简单的 demo，读取一个 class 文件，并对指定的方法进行注入，在方法执行前和执行后分别加一句打印 原始的 main 函数如下，step1() 和 step2() 函数是我们要注入的函数
+
+```java
+public class Test01 {
+	public static void main(String[] args) {
+		System.out.println("in test01 main");
+		new Test01().process(); }
+		public void process() {
+			// 注入打印 "Call step1"，也即 System.out.println("Call " + methodName); 
+      step1();
+			// 注入打印 "Return step1",也即 System.out.println("Return " + methodName);
+
+			// 注入打印 "Call step2" 
+      step2();
+			// 注入打印 "Return step2"
+	}
+
+	public void step1() { 
+    System.out.println("in step1");
+	}
+	public void step2() { 
+    System.out.println("in step2");
+	} 
+}
+
+// 执行 javac 把源文件编译成 class 文件 
+javac Test01
+```
+
+下面这段代码是把上面的Test01类文件改写并存储到一个新的文件中
+
+```java
+FileInputStream in = new FileInputStream("/path/to/Test01.class"); 
+ClassReader cr = new ClassReader(in);
+ClassWriter cw = new ClassWriter(cr, ClassWriter.COMPUTE_FRAMES); 
+ClassVisitor cv = new TraceClassVisitor(cw);
+
+cr.accept(cv, ClassReader.SKIP_FRAMES | ClassReader.SKIP_DEBUG);
+byte[] bytes = cw.toByteArray();
+// 把改写以后的类文件字节数组写入到新的文件中
+FileUtils.writeByteArrayToFile(new File("/new/path/to/Test01.class"), bytes, false);
+```
+
+核心的改写类是TraceClassVisitor。我们只需要覆盖 visitMethod ，这个方法的返回值是一个MethodVisitor,这个对象会被用来处理方法体，可以插入额外的指令来完成我们打印调用链的功能。 我们来看 一下核心的注入行System.out.println("Call step1");对应的字节码是什么
+
+```shell
+0: getstatic  	 #2 // Field java/lang/System.out:Ljava/io/PrintStream;
+3: ldc 					 #3 // String Call step1
+5: invokevirtual #4 // Method java/io/PrintStream.println:(Ljava/lang/String;)V 
+8: return
+```
+
+翻译成 ASM 的代码就是
+
+```shell
+mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;"); 
+mv.visitLdcInsn("Call " + name);
+mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+```
+
+当然这个过程，Intellij 有插件[ASM Bytecode Outline]( https://plugins.jetbrains.com/plugin/5918-asm-bytecode-outline) 可以直接生成，不用自己去手写。
+
+<img src="pic/JVM字节码从入门到精通/image-20220204224149487.png" alt="image-20220204224149487" style="zoom:50%;" />
+
+完整的 TraceClassVisitor 代码如下
+
+```java
+public class TraceClassVisitor extends ClassVisitor { 
+  public TraceClassVisitor(ClassVisitor cv) {
+		super(ASM5, cv); }
+		@Override
+		public MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
+
+		MethodVisitor mv = super.visitMethod(access, name, desc, signature, exceptions); 			return new TraceMethodVisitor(mv);
+	}
+
+	public static class TraceMethodVisitor extends MethodVisitor {
+		public TraceMethodVisitor(MethodVisitor mv) { 
+    	super(ASM5, mv);
+		}
+
+		@Override
+		public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
+			if (!name.startsWith("step")) { 
+        mv.visitMethodInsn(opcode, owner, name, desc, itf); 
+        return;
+			}
+			// 增加 System.out.println("Call " + name);
+			mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;"); 
+      mv.visitLdcInsn("Call " + name);
+			mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+
+			// 调用原始的 call
+			mv.visitMethodInsn(opcode, owner, name, desc, itf);
+			// 增加 System.out.println("Return " + name);
+			mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;"); mv.visitLdcInsn("Return " + name);
+			mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+    } 
+  }
+}
+```
+
+执行一下 main 函数，生成改写的 Test01.class，然后执行
+
+```shell
+in test01 main 
+Call step1
+in step1 
+Return step1 
+Call step2
+in step2 
+Return step2
+```
+
+生成的 class 文件用反编译工具(jd-gui)如下
+
+<img src="pic/JVM字节码从入门到精通/image-20220204224931713.png" alt="image-20220204224931713" style="zoom:50%;" />
+
+## 0x04 小结
+
+这篇文章我们主要讲解了 ASM 字节码操作框架，一起来回顾一下要点:
+
+- 第一，ASM 是一个久经考验的工业级字节码操作框架。
+- 第二，ASM 的三个核心类 ClassReader、ClassVisitor、ClassWriter。ClassReader 对象创建之后，调用 ClassReader.accept() 方法，传入一个 ClassVisitor 对象。ClassVisitor 在解析字节码的过程中遇到 不同的节点时会调用不同的 visit() 方法。ClassWriter 负责把最终修改的字节码以 byte 数组的形式返回
+- 第三，介绍完原理，用 ASM 实现了一个简单的调用链跟踪。
+
+## 0x05 思考
+
+给你留一道作业题:除了文中介绍的 ASM 的字节码应用，你知道还有哪些库或者框架使用了 ASM 吗?ASM 在其中承担的作用是什么?
+
+
+
+---
+
+
+
+# 20. CGLIB
+
+<img src="pic/JVM字节码从入门到精通/image-20220204225055950.png" alt="image-20220204225055950" style="zoom:50%;" />
+
+0x01 cglib 的简单应用
+
+如果说 ASM 是字节码改写事实上的标准，那么可以说 cglib 则是动态代理事实上的标准。 cglib 是一个强大的、高性能的代码生成库，被大量框架使用
+
+Spring:为基于代理的 AOP 框架提供方法拦截 MyBatis:用来生成 Mapper 接又的动态代理实现类 Hibernate:用来生成持久化相关的类 Guice、EasyMock、jMock 等
+
+在实现内部，cglib 库使用了 ASM 字节码操作框架来转化字节码，产生新类，帮助开发者屏蔽了很多字节码相关的内部细节，不用再去关心类文件格式、指令集等
+
+<img src="pic/JVM字节码从入门到精通/image-20220204225249519.png" alt="image-20220204225249519" style="zoom:67%;" />
+
+有这样一个 Person 类，想在 doJob 调用前和调用后分别记录一些日志
+
+```java
+public class Person {
+	public void doJob(String jobName) {
+		System.out.println("who is this class: " + getClass());
+		System.out.println("doing job: " + jobName); }
+}
+```
+
+我们可以使用 JDK 动态代理来实现，不过介于 JDK 动态代理有个明显的缺点(需要目标对象实现一个或多个接又)，在这里重点介绍 cglib 的实现方案。
+
+一个典型的实现方案是实现一个 net.sf.cglib.proxy.MethodInterceptor 接又，用来拦截方法调用。这个接又只有一个方法:public Object intercept(Object obj, java.lang.reflect.Method method,
+
+Object[] args, MethodProxy proxy) throws Throwable;
+
+这个方法的第一个参数 obj 是代理对象，第二个参数 method 是拦截的方法，第三个参数是方法的参数，第四个参数 proxy 用来调用父类的方法。MethodInterceptor 作为一个桥梁连接了目标对象和代理对 象
+
+<img src="pic/JVM字节码从入门到精通/image-20220204225352068.png" alt="image-20220204225352068" style="zoom:50%;" />
+
+cglib 代理的核心是net.sf.cglib.proxy.Enhancer类，它用于创建一个 cglib 代理。这个类有一个静态方法public static Object create(Class type, Callback callback)，该方法的第一个参数 type 指明要代理的对象类型，第二个参数 callback 是要拦截的具体实现，一般都会传入一个 MethodInterceptor 的实现
+
+```java
+public static void main(String[] _args) {
+	MethodInterceptor interceptor = new MethodInterceptor() {
+		@Override
+		public Object intercept(Object obj, Method method, Object[] args, MethodProxy methodProxy) throws Throwable {
+		
+      System.out.println(">>>>>before intercept"); 
+      Object o = methodProxy.invokeSuper(obj, args); 
+      System.out.println(">>>>>end intercept"); 
+      return o;
+    } 
+  };
+	Person person = (Person) Enhancer.create(Person.class, interceptor);
+	person.doJob("coding"); 
+}
+```
+
+运行上面的代码输出:
+
+```java
+>>>>>before intercept
+who is this class: class Person$$EnhancerByCGLIB$$a1da8fe5 
+doing job: coding
+>>>>>end intercept
+```
+
+可以用设置系统变量让 cglib 输出生成的文件
+
+```java
+System.setProperty(DebuggingClassWriter.DEBUG_LOCATION_PROPERTY, "/path/to/cglib-debug-location");
+```
+
+![image-20220204225823828](pic/JVM字节码从入门到精通/image-20220204225823828.png)
+
+核心类是 `Person$$EnhancerByCGLIB$$a1da8fe5.class`，这个类的反编译以后的代码如下
+
+```java
+public class Person$$EnhancerByCGLIB$$a1da8fe5 extends Person implements Factory { 
+	public final void doJob(String jobName) {
+		MethodInterceptor methodInterceptor = this.CGLIB$CALLBACK_0;
+		methodInterceptor.intercept(this, CGLIB$doJob$0$Method, new Object[]{jobName}, CGLIB$doJob$0$Proxy); 
+  }
+}
+```
+
+可以看到 cglib 生成了一个 Person 的子类，实现了 doJob 方法，此方法会调用 MethodInterceptor 的 intercept 函数，这个函数先输出 ">>>>>before intercept" 然后调用父类(也即真正的 Person 类)的 doJob 的方法，最后输出 ">>>>>end intercept"
+
+## 0x02 fastjson
+
+fastjson 是目前 java 语言中最快的 json 库，比自称最快的 jackson 速度要快。fastjson 库内置 ASM，基于 objectweb asm 3.3 改造，只保留必要的部分不到 2000 行代码，通过 ASM 自动生成序列号、反序列 化字节码，减少反射开销，理论上可以提高 20% 的性能。 如果不用反射，一个 json 反序列化要怎么样来做呢?下面写了一个最简单粗暴的例子，来反序列化下面的 json 字符串
+
+```json
+{
+	"id": "A10001",
+	"name": "Arthur.Zhang", 
+  "score": 100
+}
+```
+
+对应 Java bean
+
+```java
+public static class MyBean { 
+  public String id;
+	public String name; 
+  public Integer score;
+}
+```
+
+假定不考虑嵌套，特殊字符的情况，不做语法解析的情况下，可以这么来写
+
+```java
+public static void main(String[] args) {
+	String json = "{ \"id\": \"A10001\", \"name\": \"Arthur.Zhang\", \"score\": 100 }"; 	// 去掉头尾的 {}
+	String str = json.substring(1, json.length() - 1);
+	// 用 "," 分割字符串
+	String[] fieldStrArray = str.split(",");
+	MyBean bean = new MyBean();
+	
+  for (String item : fieldStrArray) {
+		// 分隔 key value
+    String[] parts = item.split(":");
+    String key = parts[0].replaceAll("\"", "").trim(); 
+    String value = parts[1].replaceAll("\"", "").trim(); 
+    // 通过反射获取字段对应的 field
+    Field field = MyBean.class.getDeclaredField(key);
+		// 根据字段类型通过反射设置字段的值
+    if (field.getType() == String.class) {
+			field.set(bean, value);
+		} else if (field.getType() == Integer.class) {
+			field.set(bean, Integer.valueOf(value)); 
+    }
+	}
+	System.out.println(bean); 
+}
+```
+
+可以看到获取获取字段 field、设置字段值都需要通过反射的方式。那么 fastjson 是怎么解决反射低效的问题的呢? 通过调试的方式，把 fastjson 生成的字节码写入到文件中。针对 MyBean，fastjson 使用 ASM 为它生成了一个反序列化的类，里面硬编码了处理序列化需要用到的所有可能场景，不再需要任何反射相关的代码。结合创新的 sort field fast match 算法，速度更上一层楼。下面是通过阅读字节码 精简以后的 Java 代码。
+
+```java
+public class FastjsonASMDeserializer_1_MyBean extends JavaBeanDeserializer { 
+  public char[] id_asm_prefix__ = "\"id\":".toCharArray();
+	public char[] name_asm_prefix__ = "\"name\":".toCharArray();
+	public char[] score_asm_prefix__ = "\"score\":".toCharArray();
+
+	@Override
+	public Object deserialze(DefaultJSONParser parser, Type type, Object fieldName, int features) {
+
+		JSONLexerBase lexer = (JSONLexerBase) parser.lexer; 
+    MyTest.MyBean localMyBean = new MyTest.MyBean();
+		String id = lexer.scanFieldString(this.id_asm_prefix__); 
+    if (lexer.matchStat > 0) {
+			localMyBean.id = id; 
+    }
+		String name = lexer.scanFieldString(this.name_asm_prefix__); 
+    if (lexer.matchStat > 0) {
+			localMyBean.name = name; 
+    }
+		Integer score = lexer.scanFieldInt(this.score_asm_prefix__); 
+    if (lexer.matchStat > 0) {
+			localMyBean.score = score; 
+    }
+		return localMyBean; 
+  }
+
+
+```
+
+通过上面的两个例子，我们可以看到 ASM 字节码技术在底层库上的强大。可能每天写业务代码不会需要使用这些底层的优化，但是当我们想造一个轮子，想读懂开源代码背后的核心时，都不得不深入 的去学习了解这部分知识，很难，但很值得。
+
+## 0x03 小结
+
+这篇文章我们主要讲解了 ASM 字节码改写技术在 cglib 和 fastjson 上的应用，一起来回顾一下要点:
+
+- 第一，cglib 使用 ASM 生成了目标代理类的一个子类，在子类中扩展父类方法，达到代理的功能，因此要求代理的类不能是 final 的。 
+- 第二，fastjson 使用 ASM 生成了实例 Bean 反序列化类，彻底去掉了反射的开销，使性能更上一层楼。
+
+## 0x04 思考
+
+给你留一道作业题:大名鼎鼎的 MyBatis 也用到了 ASM，它用 ASM 实现了什么功能呢? 欢迎你在留言区留言，和我一起讨论。
+
+
+
+---
+
+
+
+# 21. CRACK
+
+
+
+# 22. APM
 
 
 
