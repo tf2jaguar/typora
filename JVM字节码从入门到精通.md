@@ -4137,15 +4137,353 @@ Reloading: MyTestMain
 
 #### JVM Attach API 的底层原理
 
+JVM Attach API 的实现主要基于信号和 Unix 域套接字，接下来详细介绍这两部分的内容。
+
+##### 信号是什么
+
+信号是某事件发生时对进程的通知机制，也被称为“软件中断”。信号可以看做是一种非常轻量级的进程间通信，信号由一个进程发送给另外一个进程，只不过是经由内核作为一个中间人发出，信号最初 的目的是用来指定杀死进程的不同方式。
+
+每个信号都一个名字，以 "SIG" 开头，最熟知的信号应该是 SIGINT，我们在终端执行某个应用程序的过程中按下 Ctrl+C 一般会终止正在执行的进程，正是因为按下 Ctrl+C 会发送 SIGINT 信号给目标程 序。
+
+每个信号都有一个唯一的数字标识，从 1 开始，下面是常见的信号量列表:
+
+| 信号名  | 编号 | 描述                                                         |
+| ------- | ---- | ------------------------------------------------------------ |
+| SIGINT  | 2    | 键盘中断信号(Ctrl+C)                                         |
+| SIGQUIT | 3    | 键盘退出信号(Ctrl+/)                                         |
+| SIGKILL | 9    | “必杀”(sure kill) 信号，应用程序无法忽略或者捕获，总会被杀死 |
+| SIGTERM | 15   | 终止信号                                                     |
+
+在 Linux 中，一个前台进程可以使用 Ctrl+C 进行终止，对于后台进程需要使用 kill 加进程号的方式来终止，kill 命令是通过发送信号给目标进程来实现终止进程的功能。默认情况下，kill 命令发送的是编 号为 15 的 SIGTERM 信号，这个信号可以被进程捕获，选择忽略或正常退出。目标进程如何没有自定义处理这个信号，就会被终止。对于那些忽略 SIGTERM 信号的进程，则需要编号为 9 的 SIGKILL 信号 强行杀死进程，SIGKILL 信号不能被忽略也不能被捕获和自定义处理。
+
+下面写了一段 C 代码，自定义处理了 SIGQUIT、SIGINT、SIGTERM 信号
+
+signal.c
+
+```c
+static void signal_handler(int signal_no) { 
+  if (signal_no == SIGQUIT) {
+		printf("quit signal receive: %d\n", signal_no); 
+  } else if (signal_no == SIGTERM) {
+		printf("term signal receive: %d\n", signal_no); 
+  } else if (signal_no == SIGINT) {
+		printf("interrupt signal receive: %d\n", signal_no); 
+  }
+}
+
+int main() {
+	signal(SIGQUIT, signal_handler); 
+  signal(SIGINT, signal_handler); 
+  signal(SIGTERM, signal_handler); 
+  for (int i = 0;; i++) {
+    printf("%d\n", i);
+    sleep(3); 
+  }
+}
+```
+
+编译运行上面的 signal.c 文件
+
+```shell
+gcc signal.c -o signal
+./signal
+```
+
+这种情况下，在终端中Ctrl+C，kill -3，kill -15都没有办法杀掉这个进程，只能用kill -9
+
+```shell
+0
+^Cinterrupt signal receive: 2  // Ctrl+C
+1
+2
+term signal receive: 15				 // kill pid
+3
+4
+5
+quit signal receive: 3         // kill -3
+6
+7
+8
+[1] 46831 killed      ./signal // kill -9 成功杀死进程
+```
+
+JVM 对 SIGQUIT 的默认行为是打印所有运行线程的堆栈信息，在类 Unix 系统中，可以通过使用命令 kill -3 pid 来发送 SIGQUIT 信号。运行上面的 MyTestMain，使用 jps 找到整个 JVM 的进程 id，执行
+
+`kill -3 pid`，在终端就可以看到打印了所有的线程的调用栈信息:
+
+```shell
+Full thread dump Java HotSpot(TM) 64-Bit Server VM (25.51-b03 mixed mode):
+"Service Thread" #8 daemon prio=9 os_prio=31 tid=0x00007fe060821000 nid=0x4403 runnable [0x0000000000000000] java.lang.Thread.State: RUNNABLE
+...
+"Signal Dispatcher" #4 daemon prio=9 os_prio=31 tid=0x00007fe061008800 nid=0x3403 waiting on condition [0x0000000000000000]
+java.lang.Thread.State: RUNNABLE
+"main" #1 prio=5 os_prio=31 tid=0x00007fe060003800 nid=0x1003 waiting on condition [0x000070000d203000]
+java.lang.Thread.State: TIMED_WAITING (sleeping)
+at java.lang.Thread.sleep(Native Method)
+at java.lang.Thread.sleep(Thread.java:340)
+at java.util.concurrent.TimeUnit.sleep(TimeUnit.java:386) at MyTestMain.main(MyTestMain.java:10)
+```
+
+##### Unix 域套接字 (Unix Domain Socket)
+
+使用 TCP 和 UDP 进行 socket 通信是一种广为人知的 socket 使用方式，除了这种方式还有一种称为 Unix 域套接字的方式，可以实现同一主机上的进程间通信。虽然使用 127.0.01 环回地址也可以通过网络 实现同一主机的进程间通信，但 Unix 域套接字更可靠、效率更高。Docker 守护进程(Docker daemon)使用了 Unix 域套接字，容器中的进程可以通过它与Docker 守护进程进行通信。MySQL 同样提供了域套接字进行访问的方式。
+
+**Unix** **域套接字是什么?**
+
+Unix 域套接字是一个文件，通过 ls 命令可以看到
+
+```shell
+ls -l
+srwxrwxr-x. 1 ya ya 0 9月 8 00:26 tmp.sock
+```
+
+两个进程通过读写这个文件就实现了进程间的信息传递。文件的拥有者和权限决定了谁可以读写这个套接字。
 
 
-**Unix** **域套接字** ( **Unix Domain Socket** )
+
+**与普通套接字的区别是什么****?**
+
+- Unix 域套接字更加高效，Unix 套接字不用进行协议处理，不需要计算序列号，也不需要发送确认报文，只需要复制数据即可 
+- Unix 域套接字是可靠的，不会丢失报文，普通套接字是为不可靠通信设计的
+- Unix 域套接字的代码可以非常简单的修改转为普通套接字
+
+
+
+**域套接字代码示例**
+
+下面是一个简单的 C 实现的域套接字的例子
+
+server.c 充当 Unix 域套接字服务器，启动后会在当前目录生成一个名为 tmp.sock 的 Unix 域套接字文件，它读取客户端写入的内容并输出
+
+server.c
+
+```c
+#include <stdio.h>
+#include <sys/socket.h>
+#include <string.h>
+#include <sys/un.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+int main() {
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd == -1) {
+        return -1;
+    }
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strcpy(addr.sun_path, "tmp.sock");
+    int ret = bind(fd, (struct sockaddr *) &addr, sizeof(addr));
+    if (ret == -1) {
+        perror("bind error");
+        exit(-1);
+    }
+    if (listen(fd, 5) == -1) {
+        perror("listen error");
+        exit(-1);
+    }
+
+    int accept_fd;
+    char buf[100];
+
+    while (1) {
+        if ((accept_fd = accept(fd, NULL, NULL)) == -1) {
+            perror("accept error");
+            continue;
+        }
+
+        while ((ret = read(accept_fd, buf, sizeof(buf))) > 0) {
+            // 输出客户端传过来的数据
+            printf("receive %u bytes: %s\n", ret, buf);
+        }
+        if (ret == -1) {
+            perror("read");
+            exit(-1);
+        } else if (ret == 0) {
+            printf("EOF\n");
+            close(accept_fd);
+        }
+    }
+}
+```
+
+客户端代码如下：
+
+client.c
+
+```c
+#include <stdio.h>
+#include <sys/socket.h>
+#include <string.h>
+#include <sys/un.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+int main()
+{
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd == -1)
+    {
+        return -1;
+    }
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strcpy(addr.sun_path, "tmp.sock");
+    if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) == -1)
+    {
+        perror("connect error");
+        exit(-1);
+    }
+    int rc;
+    char buf[100];
+    // 读取终端标准输入的内容，写入到 Unix 域套接字文件中
+    while ((rc = read(STDIN_FILENO, buf, sizeof(buf))) > 0)
+    {
+        if (write(fd, buf, rc) < 0)
+        {
+            perror("write error");
+            exit(-1);
+        }
+    }
+}
+```
+
+在命令行中进行编译和执行
+
+```shell
+gcc server.c -o server 
+gcc client.c -o client
+```
+
+启动两个终端，一个启动 server 端，一个启动 client 端 
+
+```shell
+./server
+./client
+```
+
+可以看到当前目录生成了一个 "tmp.sock" 文件
+
+```shell
+ls -l
+srwxrwxr-x. 1 ya ya 0 9月 8 00:08 tmp.sock
+```
+
+在 client 输入 hello，在 server 的终端就可以看到 
+
+```shell
+./server
+receive 6 bytes: hello
+```
 
 
 
 #### JVM Attach 过程分析
 
+执行 MyAttachMain，当指定一个不存在的 JVM 进程时，会出现如下的错误
+
+```shell
+java -cp /path/to/your/tools.jar:. MyAttachMain 1234
+Exception in thread "main" java.io.IOException: No such process
+	at sun.tools.attach.LinuxVirtualMachine.sendQuitTo(Native Method)
+	at sun.tools.attach.LinuxVirtualMachine.<init>(LinuxVirtualMachine.java:91)
+	at sun.tools.attach.LinuxAttachProvider.attachVirtualMachine(LinuxAttachProvider.java:63) 	at com.sun.tools.attach.VirtualMachine.attach(VirtualMachine.java:208)
+	at MyAttachMain.main(MyAttachMain.java:8)
+```
+
+可以看到 VirtualMachine.attach 最终调用了 sendQuitTo 方法，这是一个 native 的方法，底层就是发送了 SIGQUIT 号给目标 JVM 进程。
+
+前面信号部分我们介绍过，JVM 对 SIGQUIT 的默认行为是 dump 当前的线程堆栈，那为什么调用 VirtualMachine.attach 没有输出调用栈堆栈呢?
+
+对于 Attach 的发起方，假设目标进程为 12345，这部分的详细的过程如下:
+
+1. Attach 端检查临时文件目录是否有 .java_pid12345 文件
+
+这个文件是一个 UNIX 域套接字文件，由 Attach 成功以后的目标 JVM 进程生成。如果这个文件存在，说明正在 Attach 中，可以用这个 socket 进行下一步的通信。如果这个文件不存在则创建一个 .attach_pid12345 文件，这部分的伪代码如下:
+
+```java
+String tmpdir = "/tmp";
+File socketFile = new File(tmpdir, ".java_pid" + pid); 
+if (socketFile.exists()) {
+	File attachFile = new File(tmpdir, ".attach_pid" + pid);
+	createAttachFile(attachFile.getPath()); 
+}
+```
+
+2. Attach 端检查如果没有 .java_pid12345 文件，创建完 .attach_pid12345 文件以后发送 SIGQUIT 信号给目标 JVM。然后每隔 200ms 检查一次 socket 文件是否已经生成，5s 以后还没有生成则退出，如果有生成则进行 socket 通信
+3. 对于目标 JVM 进程而言，它的 Signal Dispatcher 线程收到 SIGQUIT 信号以后，会检查 .attach_pid12345 文件是否存在。 
+   1. 目标 JVM 如果发现 .attach_pid12345 不存在，则认为这不是一个 attach 操作，执行默认行为，输出当前所有线程的堆栈
+   2. 目标 JVM 如果发现 .attach_pid12345 存在，则认为这是一个 attach 操作，会启动 Attach Listener 线程，负责处理 Attach 请求，同时创建名为 .java_pid12345 的 socket 文件，监听 socket。 
+
+源码中 `/hotspot/src/share/vm/runtime/os.cpp` 这一部分处理的逻辑如下:
+
+```c
+#define SIGBREAK SIGQUIT
+static void signal_thread_entry(JavaThread* thread, TRAPS) { 
+  while (true) {
+    int sig;
+		{
+			switch (sig) {
+        case SIGBREAK: {
+				// Check if the signal is a trigger to start the Attach Listener - in that 
+        // case don't print stack traces.
+				if (!DisableAttachMechanism && AttachListener::is_init_trigger()) {
+					continue; 
+        }
+				...
+				// Print stack traces 
+        }
+}
+```
+
+AttachListener 的 is_init_trigger 在 .attach_pid12345 文件存在的情况下会新建 .java_pid12345 套接字文件，同时监听此套接字，准备 Attach 端发送数据。 
+
+那 Attach 端和目标进程用 socket 传递了什么信息呢?可以通过 strace 的方式看到 Attach 端究竟往 socket 里面写了什么:
+
+```shell
+sudo strace -f java -cp /usr/local/jdk/lib/tools.jar:. MyAttachMain 12345 2> strace.out
+
+...
+5841 [pid 3869] socket(AF_LOCAL, SOCK_STREAM, 0) = 5
+5842 [pid 3869] connect(5, {sa_family=AF_LOCAL, sun_path="/tmp/.java_pid12345"}, 110) = 0
+5843 [pid 3869] write(5, "1", 1)            = 1
+5844 [pid 3869] write(5, "\0", 1)           = 1
+5845 [pid 3869] write(5, "load", 4)         = 4
+5846 [pid 3869] write(5, "\0", 1)           = 1
+5847 [pid 3869] write(5, "instrument", 10)  = 10
+5848 [pid 3869] write(5, "\0", 1)           = 1
+5849 [pid 3869] write(5, "false", 5)        = 5
+5850 [pid 3869] write(5, "\0", 1)           = 1
+5855 [pid 3869] write(5, "/home/ya/agent.jar"..., 18 <unfinished ...>
+```
+
+可以看到往 socket 写入的内容如下:
+
+```shell
+1
+\0
+load
+\0
+instrument
+\0
+false
+\0 /home/ya/agent.jar 
+\0
+```
+
+数据之间用 \0 字符分隔，第一行的 1 表示协议版本，接下来是发送指令 "load instrument false /home/ya/agent.jar" 给目标 JVM，目标 JVM 收到这些数据以后就可以加载相应的 agent jar 包进行字节 码的改写。
+
+如果从 socket 的角度来看，VirtualMachine.attach 方法相当于三次握手建连，VirtualMachine.loadAgent 则是握手成功之后发送数据，VirtualMachine.detach 相当于四次挥手断开连接。 
+
 ## 小结
+
+这个章节讲解了 javaagent，一起来回顾一下要点:
+
+- 第一，javaagent 是一个使用 instrumentation 的 API 用来改写类文件的 jar 包，可以看作是 JVM 的一个寄生插件。
+- 第二，javaagent 有两个重要的入口类: Premain-Class 和 Agent-Class，分别对应入口函数 premain 和 agentmain，其中 agentmain 可以采用远程 attach API 的方式远程挂载另一个 JVM 进程。
+- 第三，介绍了 javaagent 的 maven 打包如何配置。
 
 
 
@@ -4330,7 +4668,7 @@ Return step2
 
 <img src="pic/JVM字节码从入门到精通/image-20220204225055950.png" alt="image-20220204225055950" style="zoom:50%;" />
 
-0x01 cglib 的简单应用
+## 0x01 cglib 的简单应用
 
 如果说 ASM 是字节码改写事实上的标准，那么可以说 cglib 则是动态代理事实上的标准。 cglib 是一个强大的、高性能的代码生成库，被大量框架使用
 
