@@ -1,5 +1,4 @@
-深入了解Nginx 三
-===========
+[toc]
 
 不管是从事前端开发人员还是后端开发人员，他们在部署服务时，第一个想到的就是用Nginx做代理和静态资源缓存，因为Nginx经过千锤百炼，足以应对百万并发。
 
@@ -118,10 +117,4 @@ https://xie.infoq.cn/article/2ee961483c66a146709e7e861
 
 https://cloud.tencent.com/developer/article/1805838
 
-https://xie.infoq.cn/article/1a956ec3827587c2618d0a4b2## 目标
-
-去除 iconfinder 上 icon 的水印
-
-### 原理
-
-利用水印像素点和原图像素点颜色合并的原理，如果拥有加过水印的图片和水印图片，就可以反向推出原图原像素点的颜色；前提是你得拥有他的水印图片
+https://xie.infoq.cn/article/1a956ec3827587c2618d0a4b2
