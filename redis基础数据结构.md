@@ -172,4 +172,4 @@ Redis 主要的内部数据结构讲完了，接下来整体看一下，之前�
 
 ## 总结
 
-<img src="pic/redis基础数据结构/redis结构.png" alt="redis结构" style="zoom: 50%;" />
+<img src="pic/redis基础数据结构/redis基础数据结构.png" alt="redis基础数据结构" style="zoom:90%;" />
